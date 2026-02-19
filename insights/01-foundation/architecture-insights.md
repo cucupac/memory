@@ -28,7 +28,7 @@ Preference, fact, tactic. That's it.
 
 - Constraint is a preference with stronger language. Same kind, evidence tells you the strength.
 - Commitment is a time-bounded fact. Store as fact.
-- Negative result is a fact with a failure signal in the evidence. Store as fact with metadata.
+- Negative result is a tactic outcome. Store failed tactics as first-class linked records, not only as fact metadata.
 
 ## Three LLM interfaces
 
@@ -47,6 +47,17 @@ Scope → relevance → association → threshold → selection.
 - Association: walk from direct matches to neighbors with decay. Core, not an add-on.
 - Threshold: minimum score floor. Below it, return nothing. Empty is correct.
 - Selection: fill context budget with diversity constraints.
+
+For experiential retrieval, query across linked problem, solution, and failed-tactic memories, then expand across links before final selection.
+
+## Experiential graph shape
+
+Model experiential memory as linked nodes:
+- Problems
+- Solutions (worked attempts)
+- Failed tactics (did-not-work attempts)
+
+The immutable episode log remains raw evidence. Retrieval serves normalized nodes linked to that evidence.
 
 ## Threshold philosophy
 

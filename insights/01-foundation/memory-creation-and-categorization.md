@@ -14,6 +14,13 @@ The LLM, at write time. It knows whether it observed a preference, an experience
 
 Write interface: LLM writes a formed memory + category tag + evidence refs for grounding.
 
+For experiential writes, categorize attempts as:
+- Problem
+- Solution (worked)
+- Failed tactic (did not work)
+
+Both solution and failed tactic link back to problem and to episode evidence.
+
 ## Structural memory is different
 
 Not produced by a single episode. Built incrementally across sessions.
@@ -41,3 +48,12 @@ Old: evidence in → heuristic classifier → card out.
 New: LLM observes → LLM writes card with category → evidence attached for grounding.
 
 The event log still records evidence refs. The card — the lossy abstraction — is authored by the LLM.
+
+## Session-end experiential extraction
+
+At session end, the LLM can review episode evidence and normalize attempts:
+- Extract what was tried.
+- Mark what worked vs failed.
+- Write linked problem/solution/failed-tactic records.
+
+This keeps the immutable log raw while making retrieval memories explicit and queryable.

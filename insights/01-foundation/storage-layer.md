@@ -10,6 +10,14 @@ From design conversation 2026-02-14.
 - The repo boundary is physical, not a WHERE clause. Can't accidentally leak.
 - Delete a repo, delete its DB, done.
 
+Within repo DBs, experiential memory should be represented as linked records:
+- `problems`
+- `solutions`
+- `failed_tactics`
+- link/edge table(s) between them
+
+Episode logs remain immutable evidence and do not replace these retrieval projections.
+
 ## Why SQLite, not a vector DB
 
 Need structured filtering, full-text search, relational integrity, append-only ordering, AND vector similarity. Vector DBs give one of those. SQLite gives all but one, and cosine is trivially computed in application code at this scale.
@@ -29,7 +37,7 @@ The real cost per read is one embedding model call to embed the query (~10-50ms 
 3. Embed the query once.
 4. Cosine against all stored vectors. Milliseconds.
 5. Lexical scores (FTS/Jaccard). Milliseconds.
-6. Blend, threshold, select.
+6. Blend, threshold, traverse linked experiential neighbors, select.
 
 ## Embeddings
 
