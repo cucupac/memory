@@ -1,0 +1,2281 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Memory System Explorer</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0d0f14;
+    --surface: #151820;
+    --surface2: #1c2030;
+    --surface3: #232840;
+    --border: #2a3050;
+    --text: #e2e8f0;
+    --text-dim: #8892a4;
+    --text-dimmer: #4a5568;
+
+    --problem: #3b82f6;
+    --problem-glow: rgba(59,130,246,0.3);
+    --solution: #22c55e;
+    --solution-glow: rgba(34,197,94,0.3);
+    --failed: #f97316;
+    --failed-glow: rgba(249,115,22,0.3);
+    --fact: #eab308;
+    --fact-glow: rgba(234,179,8,0.3);
+    --preference: #a855f7;
+    --preference-glow: rgba(168,85,247,0.3);
+    --change: #06b6d4;
+    --change-glow: rgba(6,182,212,0.3);
+
+    --accent: #6366f1;
+    --accent-glow: rgba(99,102,241,0.2);
+  }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  /* HEADER */
+  .header {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 12px 20px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+  .header h1 {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--text);
+    letter-spacing: 0.02em;
+  }
+  .header .subtitle {
+    font-size: 12px;
+    color: var(--text-dim);
+  }
+
+  /* TABS */
+  .tabs {
+    display: flex;
+    gap: 2px;
+    padding: 0 20px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+  .tab {
+    padding: 10px 16px;
+    font-size: 13px;
+    color: var(--text-dim);
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    transition: all 0.15s;
+    white-space: nowrap;
+    user-select: none;
+  }
+  .tab:hover { color: var(--text); }
+  .tab.active {
+    color: var(--accent);
+    border-bottom-color: var(--accent);
+  }
+  .tab-number {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+    background: var(--surface3);
+    border-radius: 4px;
+    font-size: 10px;
+    margin-right: 6px;
+    color: var(--text-dimmer);
+  }
+  .tab.active .tab-number {
+    background: var(--accent-glow);
+    color: var(--accent);
+  }
+
+  /* MAIN CONTENT */
+  .content {
+    flex: 1;
+    overflow: hidden;
+    position: relative;
+  }
+  .view {
+    display: none;
+    width: 100%;
+    height: 100%;
+    overflow: auto;
+  }
+  .view.active { display: flex; }
+
+  /* ========== VIEW 1: MEMORY GRAPH ========== */
+  #view-graph {
+    flex-direction: row;
+  }
+  .graph-sidebar {
+    width: 260px;
+    min-width: 260px;
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    overflow-y: auto;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+  .sidebar-section {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .sidebar-label {
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-dimmer);
+  }
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    color: var(--text-dim);
+    padding: 4px 0;
+  }
+  .legend-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .graph-canvas-wrap {
+    flex: 1;
+    position: relative;
+    overflow: hidden;
+  }
+  #graphCanvas {
+    width: 100%;
+    height: 100%;
+    cursor: default;
+  }
+  .node-detail {
+    position: absolute;
+    bottom: 16px;
+    right: 16px;
+    width: 280px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px;
+    font-size: 12px;
+    display: none;
+    animation: fadeIn 0.15s ease;
+  }
+  .node-detail.visible { display: block; }
+  .node-detail-kind {
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin-bottom: 6px;
+  }
+  .node-detail-text {
+    color: var(--text);
+    line-height: 1.5;
+    margin-bottom: 8px;
+  }
+  .node-detail-links {
+    color: var(--text-dim);
+    line-height: 1.6;
+  }
+  .node-detail-links span {
+    display: inline-block;
+    padding: 1px 6px;
+    border-radius: 3px;
+    background: var(--surface3);
+    font-size: 10px;
+    margin: 1px;
+  }
+
+  /* ========== VIEW 2: RETRIEVAL PIPELINE ========== */
+  #view-retrieval {
+    flex-direction: column;
+    padding: 24px;
+    gap: 20px;
+    overflow-y: auto;
+  }
+  .retrieval-top {
+    display: flex;
+    gap: 16px;
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+  .query-box {
+    flex: 1;
+    min-width: 300px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px;
+  }
+  .query-box label {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-dimmer);
+    display: block;
+    margin-bottom: 8px;
+  }
+  .query-input {
+    width: 100%;
+    background: var(--surface3);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text);
+    font-size: 13px;
+    padding: 8px 10px;
+    font-family: inherit;
+    resize: none;
+    height: 60px;
+  }
+  .query-options {
+    display: flex;
+    gap: 8px;
+    margin-top: 10px;
+    flex-wrap: wrap;
+  }
+  .opt-chip {
+    padding: 4px 10px;
+    border-radius: 20px;
+    border: 1px solid var(--border);
+    font-size: 11px;
+    cursor: pointer;
+    transition: all 0.15s;
+    user-select: none;
+    color: var(--text-dim);
+    background: var(--surface2);
+  }
+  .opt-chip.active {
+    background: var(--accent-glow);
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+  .run-btn {
+    padding: 8px 20px;
+    background: var(--accent);
+    color: white;
+    border: none;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s;
+    margin-top: 10px;
+    font-family: inherit;
+  }
+  .run-btn:hover { opacity: 0.85; }
+  .run-btn:active { transform: scale(0.97); }
+
+  .pipeline-stages {
+    display: flex;
+    gap: 0;
+    align-items: stretch;
+    overflow-x: auto;
+    padding-bottom: 4px;
+  }
+  .stage {
+    flex: 1;
+    min-width: 130px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 0;
+    padding: 12px;
+    position: relative;
+    transition: all 0.3s;
+  }
+  .stage:first-child { border-radius: 8px 0 0 8px; }
+  .stage:last-child { border-radius: 0 8px 8px 0; }
+  .stage + .stage { border-left: none; }
+  .stage.active {
+    background: var(--surface2);
+    border-color: var(--accent);
+    z-index: 1;
+  }
+  .stage.done { border-color: var(--solution); }
+  .stage-name {
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--text-dimmer);
+    margin-bottom: 4px;
+  }
+  .stage.active .stage-name { color: var(--accent); }
+  .stage.done .stage-name { color: var(--solution); }
+  .stage-count {
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--text-dimmer);
+    line-height: 1;
+    margin-bottom: 2px;
+  }
+  .stage.active .stage-count { color: var(--text); }
+  .stage.done .stage-count { color: var(--solution); }
+  .stage-desc {
+    font-size: 10px;
+    color: var(--text-dimmer);
+    line-height: 1.4;
+  }
+
+  .lanes {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+  .lane {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px;
+  }
+  .lane-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+  .lane-badge {
+    font-size: 10px;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 4px;
+    letter-spacing: 0.05em;
+  }
+  .lane-a .lane-badge { background: rgba(99,102,241,0.2); color: var(--accent); }
+  .lane-b .lane-badge { background: rgba(6,182,212,0.2); color: var(--change); }
+  .lane-title { font-size: 12px; font-weight: 600; color: var(--text-dim); }
+
+  .memory-result {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 8px;
+    border-radius: 6px;
+    background: var(--surface2);
+    margin-bottom: 6px;
+    border-left: 3px solid transparent;
+    animation: slideIn 0.2s ease;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  .memory-result:hover { background: var(--surface3); }
+  .memory-result.expanded { background: var(--surface3); }
+  .memory-result .dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    margin-top: 3px;
+  }
+  .memory-result .text { font-size: 12px; color: var(--text); line-height: 1.4; flex: 1; }
+  .memory-result .score {
+    font-size: 10px;
+    font-weight: 600;
+    font-family: monospace;
+    padding: 1px 5px;
+    border-radius: 3px;
+    background: var(--surface3);
+    color: var(--text-dim);
+    white-space: nowrap;
+  }
+  .result-details {
+    display: none;
+    padding: 6px 8px 4px 16px;
+    font-size: 11px;
+    color: var(--text-dim);
+    line-height: 1.5;
+    border-left: 2px solid var(--border);
+    margin: 0 8px 6px 16px;
+    border-radius: 0 0 4px 4px;
+  }
+  .result-details.visible { display: block; }
+  .hop-indicator {
+    display: inline-block;
+    font-size: 9px;
+    padding: 1px 5px;
+    border-radius: 3px;
+    margin-right: 4px;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+  }
+  .hop-0 { background: rgba(99,102,241,0.3); color: #a5b4fc; }
+  .hop-1 { background: rgba(99,102,241,0.15); color: #818cf8; }
+  .hop-2 { background: rgba(99,102,241,0.08); color: #6366f1; }
+
+  .merge-section {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px;
+  }
+  .merge-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+  }
+  .merge-title { font-size: 12px; font-weight: 600; color: var(--text-dim); }
+  .threshold-control {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 11px;
+    color: var(--text-dim);
+  }
+  .threshold-control input[type=range] {
+    width: 80px;
+    accent-color: var(--accent);
+  }
+  .threshold-val { font-family: monospace; color: var(--text); }
+
+  /* ========== VIEW 3: FACT CHAIN ========== */
+  #view-facts {
+    flex-direction: column;
+    padding: 24px;
+    gap: 20px;
+    overflow-y: auto;
+  }
+  .fact-chain-container {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 20px;
+  }
+  .fact-chain-title {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-dim);
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .chain-row {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    margin-bottom: 16px;
+    position: relative;
+  }
+  .chain-node {
+    padding: 10px 14px;
+    border-radius: 8px;
+    border: 1.5px solid;
+    min-width: 180px;
+    max-width: 220px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .chain-node:hover { transform: translateY(-1px); }
+  .chain-node.fact-node { border-color: var(--fact); background: rgba(234,179,8,0.08); }
+  .chain-node.change-node { border-color: var(--change); background: rgba(6,182,212,0.08); }
+  .chain-node.superseded { opacity: 0.45; }
+  .chain-node.current {
+    box-shadow: 0 0 12px var(--fact-glow);
+  }
+  .chain-node-kind {
+    font-size: 9px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    margin-bottom: 4px;
+  }
+  .chain-node.fact-node .chain-node-kind { color: var(--fact); }
+  .chain-node.change-node .chain-node-kind { color: var(--change); }
+  .chain-node-text { font-size: 12px; color: var(--text); line-height: 1.4; }
+  .chain-node-date { font-size: 10px; color: var(--text-dimmer); margin-top: 4px; }
+  .chain-arrow {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 0 8px;
+    color: var(--text-dimmer);
+    font-size: 18px;
+    line-height: 1;
+  }
+  .chain-arrow-label {
+    font-size: 9px;
+    color: var(--text-dimmer);
+    white-space: nowrap;
+  }
+  .snapshot-banner {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 14px;
+    background: rgba(34,197,94,0.1);
+    border: 1px solid rgba(34,197,94,0.3);
+    border-radius: 8px;
+    font-size: 12px;
+    color: var(--solution);
+    font-weight: 500;
+  }
+  .add-fact-form {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px;
+  }
+  .form-row { display: flex; gap: 10px; align-items: flex-end; margin-top: 10px; }
+  .form-group { flex: 1; display: flex; flex-direction: column; gap: 5px; }
+  .form-group label { font-size: 11px; color: var(--text-dimmer); }
+  .form-input {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text);
+    font-size: 12px;
+    padding: 7px 10px;
+    font-family: inherit;
+    width: 100%;
+  }
+  .form-btn {
+    padding: 7px 16px;
+    background: var(--change);
+    color: white;
+    border: none;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: inherit;
+    white-space: nowrap;
+    transition: opacity 0.15s;
+  }
+  .form-btn:hover { opacity: 0.85; }
+
+  /* ========== VIEW 4: UTILITY ========== */
+  #view-utility {
+    flex-direction: column;
+    padding: 24px;
+    gap: 20px;
+    overflow-y: auto;
+  }
+  .utility-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+  .utility-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px;
+  }
+  .utility-card-title {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-dimmer);
+    margin-bottom: 12px;
+  }
+  .obs-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 12px;
+  }
+  .obs-row:last-child { border-bottom: none; }
+  .obs-memory { flex: 1; color: var(--text-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .obs-problem { font-size: 10px; color: var(--text-dimmer); padding: 1px 5px; background: var(--surface3); border-radius: 3px; white-space: nowrap; }
+  .vote-bar-wrap { width: 80px; background: var(--surface3); border-radius: 3px; height: 6px; flex-shrink: 0; position: relative; }
+  .vote-bar { height: 6px; border-radius: 3px; position: absolute; top: 0; }
+  .vote-pos { background: var(--solution); right: 50%; }
+  .vote-neg { background: var(--failed); left: 50%; }
+  .vote-val { font-size: 11px; font-family: monospace; color: var(--text); width: 36px; text-align: right; flex-shrink: 0; }
+  .add-vote-form {
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid var(--border);
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+  .vote-btn {
+    padding: 4px 12px;
+    border: none;
+    border-radius: 5px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: inherit;
+    transition: opacity 0.15s;
+  }
+  .vote-up { background: rgba(34,197,94,0.2); color: var(--solution); }
+  .vote-up:hover { background: rgba(34,197,94,0.35); }
+  .vote-down { background: rgba(249,115,22,0.2); color: var(--failed); }
+  .vote-down:hover { background: rgba(249,115,22,0.35); }
+
+  .global-util-bar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 12px;
+  }
+  .global-util-bar:last-child { border-bottom: none; }
+  .util-mem-name { flex: 1; color: var(--text-dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .util-bar-track { flex: 0 0 120px; background: var(--surface3); border-radius: 3px; height: 8px; position: relative; }
+  .util-bar-fill { height: 8px; border-radius: 3px; position: absolute; top: 0; left: 0; transition: width 0.5s; }
+  .util-n { font-size: 10px; color: var(--text-dimmer); width: 40px; text-align: right; }
+  .util-mean { font-size: 11px; font-family: monospace; width: 40px; text-align: right; }
+
+  /* ========== VIEW 5: SCOPE ========== */
+  #view-scope {
+    flex-direction: column;
+    padding: 24px;
+    gap: 20px;
+    overflow-y: auto;
+    align-items: center;
+  }
+  .scope-layout {
+    display: flex;
+    gap: 24px;
+    align-items: flex-start;
+    width: 100%;
+    max-width: 900px;
+  }
+  .db-box {
+    border-radius: 12px;
+    border: 2px solid;
+    padding: 16px;
+    position: relative;
+  }
+  .global-db {
+    border-color: var(--preference);
+    background: rgba(168,85,247,0.05);
+    flex: 0 0 220px;
+  }
+  .repo-area { flex: 1; display: flex; flex-direction: column; gap: 12px; }
+  .repo-db {
+    border-color: var(--problem);
+    background: rgba(59,130,246,0.05);
+  }
+  .db-label {
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    margin-bottom: 12px;
+  }
+  .global-db .db-label { color: var(--preference); }
+  .repo-db .db-label { color: var(--problem); }
+  .db-record {
+    padding: 6px 10px;
+    border-radius: 6px;
+    background: var(--surface2);
+    border-left: 3px solid;
+    font-size: 11px;
+    color: var(--text-dim);
+    margin-bottom: 6px;
+    cursor: default;
+    transition: all 0.15s;
+  }
+  .db-record:hover { background: var(--surface3); color: var(--text); }
+  .scope-arrow {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    flex: 0 0 80px;
+  }
+  .scope-demo {
+    width: 100%;
+    max-width: 900px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px;
+  }
+  .scope-demo-title {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-dimmer);
+    margin-bottom: 12px;
+  }
+  .scope-query-row {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    margin-bottom: 12px;
+    flex-wrap: wrap;
+  }
+  .scope-result-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+  .scope-result-box {
+    padding: 10px;
+    border-radius: 8px;
+    background: var(--surface2);
+    font-size: 11px;
+  }
+  .scope-result-box .label { font-weight: 600; margin-bottom: 6px; font-size: 10px; text-transform: uppercase; letter-spacing: 0.05em; }
+  .scope-result-box .item { padding: 4px 0; color: var(--text-dim); border-bottom: 1px solid var(--border); }
+  .scope-result-box .item:last-child { border-bottom: none; }
+  .scope-result-box .item .badge { display: inline-block; padding: 1px 5px; border-radius: 3px; font-size: 9px; margin-left: 4px; }
+  .visible-badge { background: rgba(34,197,94,0.2); color: var(--solution); }
+  .hidden-badge { background: rgba(249,115,22,0.2); color: var(--failed); }
+
+  /* ========== VIEW 6: SESSION FLOW ========== */
+  #view-session {
+    flex-direction: column;
+    padding: 24px;
+    gap: 20px;
+    overflow-y: auto;
+    align-items: center;
+  }
+  .session-flow {
+    width: 100%;
+    max-width: 800px;
+    position: relative;
+  }
+  .flow-step {
+    display: flex;
+    gap: 16px;
+    margin-bottom: 4px;
+    position: relative;
+  }
+  .flow-step-left {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    flex: 0 0 36px;
+  }
+  .flow-step-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 15px;
+    flex-shrink: 0;
+    border: 2px solid;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-weight: 700;
+  }
+  .flow-step-icon:hover { transform: scale(1.1); }
+  .flow-step-line {
+    flex: 1;
+    width: 2px;
+    background: var(--border);
+    margin: 4px 0;
+    min-height: 20px;
+  }
+  .flow-step-line.active-line { background: var(--accent); }
+  .flow-step-body {
+    flex: 1;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px;
+    margin-bottom: 16px;
+    transition: all 0.3s;
+  }
+  .flow-step-body.active {
+    border-color: var(--accent);
+    background: var(--surface2);
+  }
+  .flow-step-title { font-size: 13px; font-weight: 600; color: var(--text); margin-bottom: 4px; }
+  .flow-step-desc { font-size: 12px; color: var(--text-dim); line-height: 1.5; }
+  .flow-step-op {
+    display: inline-block;
+    padding: 1px 7px;
+    border-radius: 4px;
+    font-size: 10px;
+    font-weight: 700;
+    font-family: monospace;
+    margin: 4px 2px 0 0;
+    letter-spacing: 0.03em;
+  }
+  .op-read { background: rgba(59,130,246,0.2); color: var(--problem); }
+  .op-write { background: rgba(34,197,94,0.2); color: var(--solution); }
+  .op-update { background: rgba(6,182,212,0.2); color: var(--change); }
+  .session-play-btn {
+    padding: 10px 24px;
+    background: var(--accent);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: inherit;
+    transition: all 0.15s;
+    align-self: center;
+  }
+  .session-play-btn:hover { opacity: 0.85; }
+
+  /* PROMPT OUTPUT */
+  .prompt-bar {
+    flex-shrink: 0;
+    background: var(--surface);
+    border-top: 1px solid var(--border);
+    padding: 12px 20px;
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+  }
+  .prompt-label {
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-dimmer);
+    flex-shrink: 0;
+    padding-top: 2px;
+    width: 80px;
+  }
+  .prompt-text {
+    flex: 1;
+    font-size: 12px;
+    color: var(--text-dim);
+    line-height: 1.5;
+    font-style: italic;
+  }
+  .copy-btn {
+    padding: 5px 14px;
+    background: var(--surface3);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text-dim);
+    font-size: 11px;
+    cursor: pointer;
+    font-family: inherit;
+    transition: all 0.15s;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+  .copy-btn:hover { background: var(--surface2); color: var(--text); }
+
+  /* SHARED */
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+  @keyframes slideIn { from { opacity: 0; transform: translateX(-6px); } to { opacity: 1; transform: translateX(0); } }
+  @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+  .pulse { animation: pulse 1.5s ease infinite; }
+
+  .badge {
+    display: inline-block;
+    padding: 1px 6px;
+    border-radius: 4px;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+  }
+  .badge-problem { background: var(--problem-glow); color: var(--problem); }
+  .badge-solution { background: var(--solution-glow); color: var(--solution); }
+  .badge-failed { background: var(--failed-glow); color: var(--failed); }
+  .badge-fact { background: var(--fact-glow); color: var(--fact); }
+  .badge-preference { background: var(--preference-glow); color: var(--preference); }
+  .badge-change { background: var(--change-glow); color: var(--change); }
+
+  .empty-state {
+    text-align: center;
+    padding: 32px;
+    color: var(--text-dimmer);
+    font-size: 13px;
+    font-style: italic;
+  }
+
+  select.form-input { cursor: pointer; }
+  input[type=range] { cursor: pointer; }
+
+  .info-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 8px;
+    background: var(--surface3);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    font-size: 11px;
+    color: var(--text-dimmer);
+  }
+
+  .graph-instruction {
+    font-size: 11px;
+    color: var(--text-dimmer);
+    padding: 8px;
+    background: var(--surface2);
+    border-radius: 6px;
+    line-height: 1.5;
+    font-style: italic;
+  }
+  .sidebar-divider { height: 1px; background: var(--border); margin: 4px 0; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div>
+    <div style="display:flex;align-items:center;gap:8px">
+      <h1>Memory System Explorer</h1>
+      <span class="info-chip">LLM Agent Memory · v1</span>
+    </div>
+    <div class="subtitle" style="margin-top:2px">Interactive visualization of the agent memory system design</div>
+  </div>
+</div>
+
+<div class="tabs">
+  <div class="tab active" onclick="switchTab('graph')">
+    <span class="tab-number">1</span>Experiential Graph
+  </div>
+  <div class="tab" onclick="switchTab('retrieval')">
+    <span class="tab-number">2</span>Retrieval Pipeline
+  </div>
+  <div class="tab" onclick="switchTab('facts')">
+    <span class="tab-number">3</span>Fact Chain
+  </div>
+  <div class="tab" onclick="switchTab('utility')">
+    <span class="tab-number">4</span>Utility System
+  </div>
+  <div class="tab" onclick="switchTab('scope')">
+    <span class="tab-number">5</span>Scope Architecture
+  </div>
+  <div class="tab" onclick="switchTab('session')">
+    <span class="tab-number">6</span>Session Flow
+  </div>
+</div>
+
+<div class="content">
+
+  <!-- ======= VIEW 1: GRAPH ======= -->
+  <div id="view-graph" class="view active">
+    <div class="graph-sidebar">
+      <div class="sidebar-section">
+        <div class="sidebar-label">Legend</div>
+        <div class="legend-item"><div class="legend-dot" style="background:var(--problem)"></div> Problem</div>
+        <div class="legend-item"><div class="legend-dot" style="background:var(--solution)"></div> Solution (worked)</div>
+        <div class="legend-item"><div class="legend-dot" style="background:var(--failed)"></div> Failed Tactic</div>
+        <div class="legend-item"><div class="legend-dot" style="background:var(--fact)"></div> Fact</div>
+        <div class="legend-item"><div class="legend-dot" style="background:var(--preference)"></div> Preference</div>
+        <div class="legend-item"><div class="legend-dot" style="background:var(--change)"></div> Change</div>
+      </div>
+      <div class="sidebar-divider"></div>
+      <div class="sidebar-section">
+        <div class="sidebar-label">Controls</div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+          <button onclick="addNode('problem')" style="padding:5px 10px;background:var(--problem-glow);border:1px solid var(--problem);color:var(--problem);border-radius:5px;font-size:11px;cursor:pointer;font-family:inherit;font-weight:600">+ Problem</button>
+          <button onclick="addNode('solution')" style="padding:5px 10px;background:var(--solution-glow);border:1px solid var(--solution);color:var(--solution);border-radius:5px;font-size:11px;cursor:pointer;font-family:inherit;font-weight:600">+ Solution</button>
+          <button onclick="addNode('failed_tactic')" style="padding:5px 10px;background:var(--failed-glow);border:1px solid var(--failed);color:var(--failed);border-radius:5px;font-size:11px;cursor:pointer;font-family:inherit;font-weight:600">+ Failed</button>
+        </div>
+        <button onclick="runLayout()" style="padding:6px 12px;background:var(--surface3);border:1px solid var(--border);color:var(--text-dim);border-radius:5px;font-size:11px;cursor:pointer;font-family:inherit;margin-top:2px">⟳ Auto Layout</button>
+        <button onclick="resetGraph()" style="padding:6px 12px;background:var(--surface3);border:1px solid var(--border);color:var(--text-dim);border-radius:5px;font-size:11px;cursor:pointer;font-family:inherit">↺ Reset</button>
+      </div>
+      <div class="sidebar-divider"></div>
+      <div class="sidebar-section">
+        <div class="sidebar-label">Key Insight</div>
+        <div class="graph-instruction">
+          Matching <strong style="color:var(--solution)">any linked node</strong> pulls its full context. Click a solution → its problem + failed attempts appear. This is why problems, solutions, and failed tactics are first-class linked records, not just text.
+        </div>
+      </div>
+      <div class="sidebar-divider"></div>
+      <div id="graph-node-list" class="sidebar-section">
+        <div class="sidebar-label">Memories (<span id="node-count">0</span>)</div>
+      </div>
+    </div>
+    <div class="graph-canvas-wrap">
+      <canvas id="graphCanvas"></canvas>
+      <div id="nodeDetail" class="node-detail">
+        <div id="nodeDetailKind" class="node-detail-kind"></div>
+        <div id="nodeDetailText" class="node-detail-text"></div>
+        <div id="nodeDetailLinks" class="node-detail-links"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ======= VIEW 2: RETRIEVAL ======= -->
+  <div id="view-retrieval" class="view">
+    <div class="retrieval-top">
+      <div class="query-box">
+        <label>Query</label>
+        <textarea class="query-input" id="queryInput" placeholder="e.g. JWT token refresh failing silently in Next.js">JWT token refresh failing silently in Next.js middleware</textarea>
+        <div class="query-options">
+          <div class="opt-chip active" id="chip-ambient" onclick="toggleMode('ambient')">ambient</div>
+          <div class="opt-chip" id="chip-targeted" onclick="toggleMode('targeted')">targeted</div>
+          <div class="opt-chip active" id="chip-global" onclick="toggleChip('global')">+ global</div>
+          <div class="opt-chip active" id="chip-expand" onclick="toggleChip('expand')">+ expand links</div>
+        </div>
+        <button class="run-btn" onclick="runRetrieval()">▶ Run Retrieval</button>
+      </div>
+      <div style="flex:1;min-width:200px">
+        <div class="pipeline-stages" id="pipelineStages">
+          <div class="stage" data-stage="scope">
+            <div class="stage-name">Scope</div>
+            <div class="stage-count" id="stage-scope-count">—</div>
+            <div class="stage-desc">Hard filter: repo + global</div>
+          </div>
+          <div class="stage" data-stage="laneA">
+            <div class="stage-name">Lane A: Semantic</div>
+            <div class="stage-count" id="stage-laneA-count">—</div>
+            <div class="stage-desc">Vector + 2-hop walk</div>
+          </div>
+          <div class="stage" data-stage="laneB">
+            <div class="stage-name">Lane B: Keyword</div>
+            <div class="stage-count" id="stage-laneB-count">—</div>
+            <div class="stage-desc">Lexical blind spots</div>
+          </div>
+          <div class="stage" data-stage="merge">
+            <div class="stage-name">Merge</div>
+            <div class="stage-count" id="stage-merge-count">—</div>
+            <div class="stage-desc">Dedup A∪B</div>
+          </div>
+          <div class="stage" data-stage="threshold">
+            <div class="stage-name">Threshold</div>
+            <div class="stage-count" id="stage-threshold-count">—</div>
+            <div class="stage-desc">Min score floor</div>
+          </div>
+          <div class="stage" data-stage="final">
+            <div class="stage-name">Final</div>
+            <div class="stage-count" id="stage-final-count">—</div>
+            <div class="stage-desc">Diverse selection</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="lanes" id="lanesSection" style="display:none">
+      <div class="lane lane-a">
+        <div class="lane-header">
+          <span class="lane-badge">LANE A</span>
+          <span class="lane-title">Semantic + Association Walk</span>
+        </div>
+        <div id="laneAResults"></div>
+      </div>
+      <div class="lane lane-b">
+        <div class="lane-header">
+          <span class="lane-badge">LANE B</span>
+          <span class="lane-title">Keyword Search</span>
+        </div>
+        <div id="laneBResults"></div>
+      </div>
+    </div>
+
+    <div class="merge-section" id="mergeSection" style="display:none">
+      <div class="merge-header">
+        <div class="merge-title">Merged Results (after dedup)</div>
+        <div class="threshold-control">
+          Threshold: <input type="range" id="thresholdSlider" min="0" max="1" step="0.05" value="0.5" oninput="updateThreshold()">
+          <span class="threshold-val" id="thresholdVal">0.50</span>
+        </div>
+      </div>
+      <div id="mergeResults"></div>
+    </div>
+  </div>
+
+  <!-- ======= VIEW 3: FACTS ======= -->
+  <div id="view-facts" class="view">
+    <div class="fact-chain-container">
+      <div class="fact-chain-title">
+        📜 Fact Update Chains
+        <span class="info-chip" style="font-size:10px">Immutable · append-only</span>
+      </div>
+      <div id="factChains"></div>
+    </div>
+
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px">
+      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:var(--text-dimmer);margin-bottom:8px">Current Fact Snapshot View</div>
+      <div style="font-size:11px;color:var(--text-dimmer);margin-bottom:10px;font-style:italic">Facts not yet superseded by a newer fact in the chain — what the agent sees as "current truth"</div>
+      <div id="factSnapshot"></div>
+    </div>
+
+    <div class="add-fact-form">
+      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:var(--text-dimmer);margin-bottom:2px">Simulate a Fact Update</div>
+      <div style="font-size:11px;color:var(--text-dimmer);margin-bottom:8px;font-style:italic">Select an existing fact and describe what changed — creates an immutable change + new fact record</div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Old Fact (supersede)</label>
+          <select class="form-input" id="oldFactSelect"></select>
+        </div>
+        <div class="form-group">
+          <label>What changed (change memory)</label>
+          <input class="form-input" id="changeInput" placeholder="e.g. Auth config migrated to env vars">
+        </div>
+        <div class="form-group">
+          <label>New Fact</label>
+          <input class="form-input" id="newFactInput" placeholder="e.g. JWT secret now loaded from process.env.JWT_SECRET">
+        </div>
+        <button class="form-btn" onclick="addFactUpdate()">→ Apply Chain Update</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ======= VIEW 4: UTILITY ======= -->
+  <div id="view-utility" class="view">
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px">
+      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:var(--text-dimmer);margin-bottom:6px">How Utility Works</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;font-size:12px;color:var(--text-dim)">
+        <div style="padding:10px;background:var(--surface2);border-radius:8px;line-height:1.5">
+          <div style="font-weight:600;color:var(--text);margin-bottom:4px">Context-Specific</div>
+          Each vote is tied to a specific (memory, problem) pair. "Was this memory helpful for <em>this</em> problem?"
+        </div>
+        <div style="padding:10px;background:var(--surface2);border-radius:8px;line-height:1.5">
+          <div style="font-weight:600;color:var(--text);margin-bottom:4px">Global = Weak Prior</div>
+          Average across all contexts gives a global signal — but it's only a prior, not primary ranking.
+        </div>
+        <div style="padding:10px;background:var(--surface2);border-radius:8px;line-height:1.5">
+          <div style="font-weight:600;color:var(--text);margin-bottom:4px">No Evidence = Weaker</div>
+          Votes without evidence refs have smaller impact. Optional attribution, but encouraged.
+        </div>
+      </div>
+    </div>
+
+    <div class="utility-grid">
+      <div class="utility-card">
+        <div class="utility-card-title">Utility Observations (context-specific)</div>
+        <div id="utilityObsTable"></div>
+        <div class="add-vote-form">
+          <select class="form-input" id="voteMemorySelect" style="flex:1;min-width:120px"></select>
+          <span style="font-size:11px;color:var(--text-dimmer)">for problem:</span>
+          <select class="form-input" id="voteProblemSelect" style="flex:1;min-width:100px"></select>
+          <button class="vote-btn vote-up" onclick="castVote(1)">👍 +1</button>
+          <button class="vote-btn vote-down" onclick="castVote(-1)">👎 -1</button>
+        </div>
+      </div>
+      <div class="utility-card">
+        <div class="utility-card-title">Global Utility View (avg across contexts)</div>
+        <div style="font-size:11px;color:var(--text-dimmer);margin-bottom:10px;font-style:italic">Computed from observations — treated as weak prior, not primary signal</div>
+        <div id="globalUtilityTable"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ======= VIEW 5: SCOPE ======= -->
+  <div id="view-scope" class="view">
+    <div style="font-size:13px;color:var(--text-dim);text-align:center;max-width:600px;line-height:1.6;margin-bottom:4px">
+      Repo boundaries are <strong style="color:var(--text)">physical, not logical</strong> — one SQLite DB per repo, one global DB. A read opens both. Cross-repo facts don't leak — they're invisible, not just lower-ranked.
+    </div>
+
+    <div class="scope-layout">
+      <div class="db-box global-db">
+        <div class="db-label">🌐 Global DB</div>
+        <div class="db-record" style="border-color:var(--preference)">
+          <span class="badge badge-preference">preference</span>
+          <div style="margin-top:3px;font-size:11px">Use TypeScript strict mode always</div>
+        </div>
+        <div class="db-record" style="border-color:var(--preference)">
+          <span class="badge badge-preference">preference</span>
+          <div style="margin-top:3px;font-size:11px">Prefer functional patterns over OOP</div>
+        </div>
+        <div class="db-record" style="border-color:var(--preference)">
+          <span class="badge badge-preference">preference</span>
+          <div style="margin-top:3px;font-size:11px">Always write tests for edge cases</div>
+        </div>
+        <div style="margin-top:10px;font-size:10px;color:var(--text-dimmer);font-style:italic">Preferences only — travel everywhere</div>
+      </div>
+
+      <div class="scope-arrow">
+        <div style="font-size:10px;color:var(--text-dimmer);text-align:center">read opens both</div>
+        <div style="font-size:24px;color:var(--text-dimmer)">⇐</div>
+        <div style="font-size:10px;color:var(--text-dimmer);text-align:center">nothing leaks between repos</div>
+        <div style="width:2px;flex:1;background:var(--border);margin:4px auto"></div>
+        <div style="font-size:24px;color:var(--failed)">✕</div>
+        <div style="font-size:10px;color:var(--failed);text-align:center">cross-repo fact access</div>
+      </div>
+
+      <div class="repo-area">
+        <div class="db-box repo-db">
+          <div class="db-label">📁 Repo DB: api-service</div>
+          <div class="db-record" style="border-color:var(--problem)">
+            <span class="badge badge-problem">problem</span>
+            <div style="margin-top:3px;font-size:11px">JWT refresh silently fails in middleware</div>
+          </div>
+          <div class="db-record" style="border-color:var(--solution)">
+            <span class="badge badge-solution">solution</span>
+            <div style="margin-top:3px;font-size:11px">Check token expiry before refresh in withAuth()</div>
+          </div>
+          <div class="db-record" style="border-color:var(--failed)">
+            <span class="badge badge-failed">failed_tactic</span>
+            <div style="margin-top:3px;font-size:11px">Tried client-side refresh — race condition</div>
+          </div>
+          <div class="db-record" style="border-color:var(--fact)">
+            <span class="badge badge-fact">fact</span>
+            <div style="margin-top:3px;font-size:11px">Auth middleware lives in /lib/auth/withAuth.ts</div>
+          </div>
+          <div class="db-record" style="border-color:var(--preference)">
+            <span class="badge badge-preference">preference</span>
+            <div style="margin-top:3px;font-size:11px">Use zod for all API input validation (repo override)</div>
+          </div>
+        </div>
+
+        <div class="db-box repo-db" style="opacity:0.6">
+          <div class="db-label">📁 Repo DB: mobile-app</div>
+          <div class="db-record" style="border-color:var(--problem)">
+            <span class="badge badge-problem">problem</span>
+            <div style="margin-top:3px;font-size:11px">Offline sync conflicts on reconnect</div>
+          </div>
+          <div class="db-record" style="border-color:var(--fact)">
+            <span class="badge badge-fact">fact</span>
+            <div style="margin-top:3px;font-size:11px">Sync state managed in /stores/syncStore.ts</div>
+          </div>
+          <div style="font-size:10px;color:var(--text-dimmer);font-style:italic;margin-top:8px">Invisible when working in api-service</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="scope-demo">
+      <div class="scope-demo-title">Simulate a Read in api-service</div>
+      <div class="scope-query-row">
+        <select class="form-input" style="flex:0 0 140px" id="scopeRepoSelect" onchange="renderScopeDemo()">
+          <option value="api-service">api-service</option>
+          <option value="mobile-app">mobile-app</option>
+        </select>
+        <input class="form-input" style="flex:1" id="scopeQuery" value="auth token" oninput="renderScopeDemo()" placeholder="Query...">
+        <span style="font-size:11px;color:var(--text-dimmer)">include_global: on</span>
+      </div>
+      <div class="scope-result-grid" id="scopeResultGrid"></div>
+    </div>
+  </div>
+
+  <!-- ======= VIEW 6: SESSION ======= -->
+  <div id="view-session" class="view">
+    <div style="font-size:13px;color:var(--text-dim);text-align:center;max-width:600px;line-height:1.6;margin-bottom:4px">
+      A complete agent session: ambient read at start → encounter problem → targeted retrieval → solve → write memories + utility votes at end
+    </div>
+    <button class="session-play-btn" onclick="playSession()">▶ Replay Session</button>
+    <div class="session-flow" id="sessionFlow"></div>
+  </div>
+
+</div>
+
+<div class="prompt-bar">
+  <div class="prompt-label">Prompt</div>
+  <div class="prompt-text" id="promptText">Click around any view to explore — the prompt will update with relevant context for querying Claude about this memory system design.</div>
+  <button class="copy-btn" onclick="copyPrompt()">Copy</button>
+</div>
+
+<script>
+// ============================================================
+// STATE
+// ============================================================
+const state = {
+  activeTab: 'graph',
+  retrievalMode: 'ambient',
+  retrievalChips: { global: true, expand: true },
+  threshold: 0.5,
+  sessionStep: -1,
+};
+
+const KIND_COLORS = {
+  problem: '#3b82f6',
+  solution: '#22c55e',
+  failed_tactic: '#f97316',
+  fact: '#eab308',
+  preference: '#a855f7',
+  change: '#06b6d4',
+};
+
+// ============================================================
+// TABS
+// ============================================================
+function switchTab(tab) {
+  state.activeTab = tab;
+  document.querySelectorAll('.tab').forEach((t, i) => {
+    const tabs = ['graph','retrieval','facts','utility','scope','session'];
+    t.classList.toggle('active', tabs[i] === tab);
+  });
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.getElementById('view-' + tab).classList.add('active');
+  if (tab === 'graph') { setTimeout(resizeCanvas, 50); }
+  if (tab === 'facts') renderFactView();
+  if (tab === 'utility') renderUtilityView();
+  if (tab === 'scope') renderScopeDemo();
+  if (tab === 'session') renderSessionFlow();
+  updatePrompt();
+}
+
+// ============================================================
+// GRAPH VIEW
+// ============================================================
+let graphNodes = [];
+let graphEdges = [];
+let dragging = null;
+let dragOffset = { x: 0, y: 0 };
+let selectedNode = null;
+let hoveredNode = null;
+let animFrame = null;
+
+const GRAPH_DATA = {
+  nodes: [
+    { id: 'p1', kind: 'problem', text: 'JWT refresh silently fails in Next.js middleware', x: 350, y: 180, scope: 'repo' },
+    { id: 's1', kind: 'solution', text: 'Check token expiry before refresh call in withAuth()', x: 550, y: 100, scope: 'repo' },
+    { id: 'f1', kind: 'failed_tactic', text: 'Tried client-side refresh — caused race condition', x: 550, y: 260, scope: 'repo' },
+    { id: 'f2', kind: 'failed_tactic', text: 'Added retry logic — masked the root cause', x: 550, y: 340, scope: 'repo' },
+    { id: 'p2', kind: 'problem', text: 'TypeScript type errors in API response union types', x: 160, y: 300, scope: 'repo' },
+    { id: 's2', kind: 'solution', text: 'Use discriminated unions with explicit kind field', x: 100, y: 420, scope: 'repo' },
+    { id: 'f3', kind: 'failed_tactic', text: 'Used type assertion (as) — unsafe, broke at runtime', x: 280, y: 420, scope: 'repo' },
+    { id: 'fact1', kind: 'fact', text: 'Auth middleware lives in /lib/auth/withAuth.ts', x: 160, y: 150, scope: 'repo' },
+    { id: 'pref1', kind: 'preference', text: 'Use TypeScript strict mode always', x: 450, y: 420, scope: 'global' },
+  ],
+  edges: [
+    { from: 'p1', to: 's1', label: 'solution' },
+    { from: 'p1', to: 'f1', label: 'failed' },
+    { from: 'p1', to: 'f2', label: 'failed' },
+    { from: 'p2', to: 's2', label: 'solution' },
+    { from: 'p2', to: 'f3', label: 'failed' },
+  ]
+};
+
+function resetGraph() {
+  graphNodes = GRAPH_DATA.nodes.map(n => ({ ...n }));
+  graphEdges = GRAPH_DATA.edges.map(e => ({ ...e }));
+  selectedNode = null;
+  hoveredNode = null;
+  renderGraphSidebar();
+  drawGraph();
+}
+
+function resizeCanvas() {
+  const canvas = document.getElementById('graphCanvas');
+  const wrap = canvas.parentElement;
+  canvas.width = wrap.clientWidth;
+  canvas.height = wrap.clientHeight;
+  drawGraph();
+}
+
+function drawGraph() {
+  const canvas = document.getElementById('graphCanvas');
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+  ctx.clearRect(0, 0, W, H);
+
+  // Draw edges
+  for (const edge of graphEdges) {
+    const from = graphNodes.find(n => n.id === edge.from);
+    const to = graphNodes.find(n => n.id === edge.to);
+    if (!from || !to) continue;
+
+    const isHighlighted = selectedNode && (selectedNode.id === edge.from || selectedNode.id === edge.to);
+    ctx.beginPath();
+    ctx.moveTo(from.x, from.y);
+    ctx.lineTo(to.x, to.y);
+    ctx.strokeStyle = isHighlighted
+      ? (edge.label === 'solution' ? '#22c55e' : '#f97316')
+      : 'rgba(255,255,255,0.12)';
+    ctx.lineWidth = isHighlighted ? 2 : 1.5;
+    ctx.setLineDash(edge.label === 'failed' ? [5, 4] : []);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Arrow
+    const angle = Math.atan2(to.y - from.y, to.x - from.x);
+    const dist = Math.hypot(to.x - from.x, to.y - from.y);
+    const r = 22;
+    const ax = to.x - Math.cos(angle) * r;
+    const ay = to.y - Math.sin(angle) * r;
+    ctx.beginPath();
+    ctx.moveTo(ax, ay);
+    ctx.lineTo(ax - 10 * Math.cos(angle - 0.4), ay - 10 * Math.sin(angle - 0.4));
+    ctx.lineTo(ax - 10 * Math.cos(angle + 0.4), ay - 10 * Math.sin(angle + 0.4));
+    ctx.closePath();
+    ctx.fillStyle = isHighlighted
+      ? (edge.label === 'solution' ? '#22c55e' : '#f97316')
+      : 'rgba(255,255,255,0.2)';
+    ctx.fill();
+
+    // Edge label
+    if (isHighlighted) {
+      const mx = (from.x + to.x) / 2;
+      const my = (from.y + to.y) / 2;
+      ctx.font = '10px -apple-system, sans-serif';
+      ctx.fillStyle = edge.label === 'solution' ? '#22c55e' : '#f97316';
+      ctx.textAlign = 'center';
+      ctx.fillText(edge.label, mx, my - 4);
+    }
+  }
+
+  // Draw nodes
+  for (const node of graphNodes) {
+    const isSelected = selectedNode && selectedNode.id === node.id;
+    const isHovered = hoveredNode && hoveredNode.id === node.id;
+    const isRelated = selectedNode && graphEdges.some(e =>
+      (e.from === selectedNode.id && e.to === node.id) ||
+      (e.to === selectedNode.id && e.from === node.id)
+    );
+
+    const color = KIND_COLORS[node.kind];
+    const r = 22;
+
+    ctx.save();
+    // Glow
+    if (isSelected || isRelated) {
+      ctx.shadowColor = color;
+      ctx.shadowBlur = isSelected ? 20 : 10;
+    }
+    // Circle fill
+    ctx.beginPath();
+    ctx.arc(node.x, node.y, r, 0, Math.PI * 2);
+    ctx.fillStyle = isSelected
+      ? color + '44'
+      : isRelated ? color + '22' : '#1c2030';
+    ctx.fill();
+    // Border
+    ctx.strokeStyle = color;
+    ctx.lineWidth = isSelected ? 2.5 : (isHovered ? 2 : 1.5);
+    ctx.stroke();
+    ctx.restore();
+
+    // Icon
+    const icons = { problem: '?', solution: '✓', failed_tactic: '✕', fact: 'F', preference: 'P', change: 'C' };
+    ctx.font = `bold 14px -apple-system, sans-serif`;
+    ctx.fillStyle = color;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(icons[node.kind] || node.kind[0].toUpperCase(), node.x, node.y);
+
+    // Label
+    const shortText = node.text.length > 28 ? node.text.slice(0, 26) + '…' : node.text;
+    ctx.font = '10px -apple-system, sans-serif';
+    ctx.fillStyle = isSelected ? '#e2e8f0' : '#8892a4';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'top';
+
+    // Background for label
+    const tw = ctx.measureText(shortText).width;
+    ctx.fillStyle = 'rgba(13,15,20,0.85)';
+    ctx.fillRect(node.x - tw / 2 - 3, node.y + r + 4, tw + 6, 14);
+    ctx.fillStyle = isSelected ? '#e2e8f0' : '#8892a4';
+    ctx.fillText(shortText, node.x, node.y + r + 5);
+
+    // Scope badge
+    if (node.scope === 'global') {
+      ctx.font = '8px -apple-system, sans-serif';
+      ctx.fillStyle = '#a855f7';
+      ctx.textAlign = 'left';
+      ctx.fillText('🌐', node.x + r - 8, node.y - r - 10);
+    }
+  }
+}
+
+function getNodeAt(x, y) {
+  for (let i = graphNodes.length - 1; i >= 0; i--) {
+    const n = graphNodes[i];
+    if (Math.hypot(n.x - x, n.y - y) < 22) return n;
+  }
+  return null;
+}
+
+function initGraph() {
+  const canvas = document.getElementById('graphCanvas');
+  resetGraph();
+  resizeCanvas();
+
+  canvas.addEventListener('mousedown', e => {
+    const rect = canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left, y = e.clientY - rect.top;
+    const node = getNodeAt(x, y);
+    if (node) {
+      dragging = node;
+      dragOffset = { x: x - node.x, y: y - node.y };
+      selectedNode = node;
+      showNodeDetail(node);
+      drawGraph();
+      renderGraphSidebar();
+    } else {
+      selectedNode = null;
+      document.getElementById('nodeDetail').classList.remove('visible');
+      drawGraph();
+      renderGraphSidebar();
+    }
+  });
+
+  canvas.addEventListener('mousemove', e => {
+    const rect = canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left, y = e.clientY - rect.top;
+    if (dragging) {
+      dragging.x = x - dragOffset.x;
+      dragging.y = y - dragOffset.y;
+      drawGraph();
+    } else {
+      const node = getNodeAt(x, y);
+      hoveredNode = node;
+      canvas.style.cursor = node ? 'pointer' : 'default';
+      drawGraph();
+    }
+  });
+
+  canvas.addEventListener('mouseup', () => { dragging = null; });
+  canvas.addEventListener('mouseleave', () => { dragging = null; hoveredNode = null; drawGraph(); });
+  window.addEventListener('resize', resizeCanvas);
+}
+
+function showNodeDetail(node) {
+  const detail = document.getElementById('nodeDetail');
+  const related = graphEdges.filter(e => e.from === node.id || e.to === node.id);
+  const relatedNodes = related.map(e => {
+    const otherId = e.from === node.id ? e.to : e.from;
+    const other = graphNodes.find(n => n.id === otherId);
+    return { node: other, label: e.label, direction: e.from === node.id ? '→' : '←' };
+  }).filter(r => r.node);
+
+  document.getElementById('nodeDetailKind').innerHTML =
+    `<span class="badge badge-${node.kind}">${node.kind}</span> · <span style="color:var(--text-dimmer);font-size:10px">${node.scope}</span>`;
+  document.getElementById('nodeDetailText').textContent = node.text;
+
+  let linksHtml = '';
+  if (relatedNodes.length > 0) {
+    linksHtml = '<div style="font-size:10px;font-weight:600;color:var(--text-dimmer);margin-bottom:4px;text-transform:uppercase;letter-spacing:0.06em">Linked:</div>';
+    relatedNodes.forEach(r => {
+      linksHtml += `<span style="display:inline-block;margin:2px;padding:2px 6px;border-radius:3px;background:var(--surface3);font-size:10px;color:${KIND_COLORS[r.node.kind]}">${r.direction} ${r.node.text.slice(0, 32)}…</span>`;
+    });
+    linksHtml += `<div style="margin-top:6px;font-size:10px;color:var(--text-dimmer);font-style:italic">Clicking any linked node pulls its full context — problem + all attempts</div>`;
+  }
+  document.getElementById('nodeDetailLinks').innerHTML = linksHtml || '<span style="color:var(--text-dimmer);font-size:11px;font-style:italic">No links</span>';
+  detail.classList.add('visible');
+  updatePrompt();
+}
+
+function renderGraphSidebar() {
+  const list = document.getElementById('graph-node-list');
+  document.getElementById('node-count').textContent = graphNodes.length;
+  const items = graphNodes.map(n => {
+    const isSelected = selectedNode && selectedNode.id === n.id;
+    return `<div onclick="selectNodeById('${n.id}')" style="
+      display:flex;align-items:center;gap:6px;padding:4px 6px;border-radius:5px;
+      background:${isSelected ? 'var(--surface3)' : 'transparent'};
+      cursor:pointer;transition:background 0.1s;font-size:11px;color:var(--text-dim)
+    ">
+      <div style="width:8px;height:8px;border-radius:50%;background:${KIND_COLORS[n.kind]};flex-shrink:0"></div>
+      <div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1">${n.text.slice(0,32)}…</div>
+    </div>`;
+  }).join('');
+  const existingLabel = list.querySelector('.sidebar-label');
+  list.innerHTML = '';
+  const label = document.createElement('div');
+  label.className = 'sidebar-label';
+  label.innerHTML = `Memories (<span id="node-count">${graphNodes.length}</span>)`;
+  list.appendChild(label);
+  list.insertAdjacentHTML('beforeend', items);
+}
+
+function selectNodeById(id) {
+  selectedNode = graphNodes.find(n => n.id === id);
+  if (selectedNode) showNodeDetail(selectedNode);
+  drawGraph();
+  renderGraphSidebar();
+}
+
+let nodeCounter = 100;
+const newNodeTexts = {
+  problem: ['Auth token expiry not handled in SSR', 'CORS error on preflight OPTIONS', 'Memory leak in event listener cleanup', 'Race condition in parallel API calls'],
+  solution: ['Validate token server-side before rendering', 'Add OPTIONS handler to Express router', 'Return cleanup function from useEffect', 'Use Promise.allSettled for parallel calls'],
+  failed_tactic: ['Used localStorage for token (insecure)', 'Disabled CORS in dev (masked issue)', 'Used WeakMap (not the root cause)', 'Sequential await in a loop (too slow)'],
+};
+function addNode(kind) {
+  const texts = newNodeTexts[kind];
+  const text = texts[nodeCounter % texts.length];
+  const canvas = document.getElementById('graphCanvas');
+  const node = {
+    id: 'n' + nodeCounter++,
+    kind, text,
+    x: 100 + Math.random() * (canvas.width - 200),
+    y: 100 + Math.random() * (canvas.height - 200),
+    scope: kind === 'preference' ? 'global' : 'repo',
+  };
+  graphNodes.push(node);
+
+  // Auto-link solutions and failed_tactics to a random problem
+  if ((kind === 'solution' || kind === 'failed_tactic') && graphNodes.some(n => n.kind === 'problem')) {
+    const problems = graphNodes.filter(n => n.kind === 'problem');
+    const problem = problems[Math.floor(Math.random() * problems.length)];
+    graphEdges.push({ from: problem.id, to: node.id, label: kind === 'solution' ? 'solution' : 'failed' });
+  }
+  renderGraphSidebar();
+  drawGraph();
+}
+
+function runLayout() {
+  // Simple force-directed
+  for (let iter = 0; iter < 200; iter++) {
+    const forces = graphNodes.map(() => ({ x: 0, y: 0 }));
+    // Repulsion
+    for (let i = 0; i < graphNodes.length; i++) {
+      for (let j = i + 1; j < graphNodes.length; j++) {
+        const dx = graphNodes[i].x - graphNodes[j].x;
+        const dy = graphNodes[i].y - graphNodes[j].y;
+        const dist = Math.max(Math.hypot(dx, dy), 1);
+        const force = 8000 / (dist * dist);
+        forces[i].x += (dx / dist) * force;
+        forces[i].y += (dy / dist) * force;
+        forces[j].x -= (dx / dist) * force;
+        forces[j].y -= (dy / dist) * force;
+      }
+    }
+    // Attraction along edges
+    for (const edge of graphEdges) {
+      const fi = graphNodes.findIndex(n => n.id === edge.from);
+      const ti = graphNodes.findIndex(n => n.id === edge.to);
+      if (fi < 0 || ti < 0) continue;
+      const dx = graphNodes[fi].x - graphNodes[ti].x;
+      const dy = graphNodes[fi].y - graphNodes[ti].y;
+      const dist = Math.max(Math.hypot(dx, dy), 1);
+      const force = dist / 200;
+      forces[fi].x -= dx * force;
+      forces[fi].y -= dy * force;
+      forces[ti].x += dx * force;
+      forces[ti].y += dy * force;
+    }
+    // Apply
+    const canvas = document.getElementById('graphCanvas');
+    const damp = 0.8;
+    for (let i = 0; i < graphNodes.length; i++) {
+      graphNodes[i].x = Math.max(40, Math.min(canvas.width - 40, graphNodes[i].x + forces[i].x * 0.1 * damp));
+      graphNodes[i].y = Math.max(40, Math.min(canvas.height - 40, graphNodes[i].y + forces[i].y * 0.1 * damp));
+    }
+  }
+  drawGraph();
+}
+
+// ============================================================
+// RETRIEVAL VIEW
+// ============================================================
+const MEMORY_BANK = [
+  { id: 'm1', kind: 'problem', text: 'JWT refresh silently fails in Next.js middleware', scope: 'repo', embedding: [0.9,0.8,0.1,0.2] },
+  { id: 'm2', kind: 'solution', text: 'Check token expiry before refresh call in withAuth()', scope: 'repo', embedding: [0.85,0.75,0.15,0.2], linkedProblem: 'm1' },
+  { id: 'm3', kind: 'failed_tactic', text: 'Tried client-side refresh — caused race condition with SSR', scope: 'repo', embedding: [0.8,0.7,0.2,0.25], linkedProblem: 'm1' },
+  { id: 'm4', kind: 'failed_tactic', text: 'Added retry logic to refresh — masked the root cause', scope: 'repo', embedding: [0.7,0.65,0.15,0.3], linkedProblem: 'm1' },
+  { id: 'm5', kind: 'fact', text: 'Auth middleware lives in /lib/auth/withAuth.ts', scope: 'repo', embedding: [0.6,0.55,0.4,0.1] },
+  { id: 'm6', kind: 'fact', text: 'JWT_SECRET loaded from process.env in next.config.js', scope: 'repo', embedding: [0.55,0.5,0.3,0.2] },
+  { id: 'm7', kind: 'preference', text: 'Use TypeScript strict mode always', scope: 'global', embedding: [0.1,0.2,0.9,0.8] },
+  { id: 'm8', kind: 'preference', text: 'Prefer functional patterns over class-based components', scope: 'global', embedding: [0.15,0.1,0.85,0.75] },
+  { id: 'm9', kind: 'problem', text: 'TypeScript type errors in API response union types', scope: 'repo', embedding: [0.3,0.4,0.5,0.6] },
+  { id: 'm10', kind: 'solution', text: 'Use discriminated unions with explicit kind field', scope: 'repo', embedding: [0.25,0.35,0.55,0.65], linkedProblem: 'm9' },
+];
+
+function cosineSim(a, b) {
+  let dot = 0, na = 0, nb = 0;
+  for (let i = 0; i < a.length; i++) { dot += a[i]*b[i]; na += a[i]*a[i]; nb += b[i]*b[i]; }
+  return dot / (Math.sqrt(na) * Math.sqrt(nb) + 1e-8);
+}
+
+function queryEmbedding(text) {
+  // Simulate embedding based on keyword presence
+  const t = text.toLowerCase();
+  const jwt = (t.includes('jwt') || t.includes('token') || t.includes('auth') || t.includes('refresh')) ? 0.9 : 0.1;
+  const mw = (t.includes('middleware') || t.includes('next') || t.includes('ssr')) ? 0.75 : 0.15;
+  const ts = (t.includes('typescript') || t.includes('type') || t.includes('strict')) ? 0.3 : 0.1;
+  const pref = (t.includes('prefer') || t.includes('style') || t.includes('pattern')) ? 0.2 : 0.1;
+  return [jwt, mw, ts, pref];
+}
+
+function toggleMode(mode) {
+  state.retrievalMode = mode;
+  document.getElementById('chip-ambient').classList.toggle('active', mode === 'ambient');
+  document.getElementById('chip-targeted').classList.toggle('active', mode === 'targeted');
+}
+
+function toggleChip(key) {
+  state.retrievalChips[key] = !state.retrievalChips[key];
+  document.getElementById('chip-' + key).classList.toggle('active', state.retrievalChips[key]);
+}
+
+function updateThreshold() {
+  state.threshold = parseFloat(document.getElementById('thresholdSlider').value);
+  document.getElementById('thresholdVal').textContent = state.threshold.toFixed(2);
+  renderMergeResults();
+}
+
+let retrievalResults = { laneA: [], laneB: [] };
+
+async function runRetrieval() {
+  const query = document.getElementById('queryInput').value;
+  const qEmb = queryEmbedding(query);
+  const queryWords = new Set(query.toLowerCase().split(/\W+/).filter(w => w.length > 3));
+  const threshold = state.retrievalMode === 'ambient' ? 0.55 : 0.4;
+  const includeGlobal = state.retrievalChips.global;
+
+  // Animate stages
+  const stages = ['scope','laneA','laneB','merge','threshold','final'];
+  const allStages = document.querySelectorAll('.stage');
+  allStages.forEach(s => s.classList.remove('active','done'));
+
+  async function animateStage(i, count, fn) {
+    allStages[i].classList.add('active');
+    await delay(400);
+    fn(count);
+    allStages[i].classList.remove('active');
+    allStages[i].classList.add('done');
+  }
+
+  // Scope filter
+  await animateStage(0, null, () => {});
+  let scoped = MEMORY_BANK.filter(m => m.scope === 'repo' || (m.scope === 'global' && includeGlobal));
+  document.getElementById('stage-scope-count').textContent = scoped.length;
+
+  // Lane A: semantic
+  await animateStage(1, null, () => {});
+  let seeds = scoped.map(m => ({
+    ...m,
+    score: cosineSim(m.embedding, qEmb),
+    hop: 0,
+  })).filter(m => m.score > threshold);
+  seeds.sort((a, b) => b.score - a.score);
+  seeds = seeds.slice(0, 5);
+
+  // Association walk (2 hops)
+  let laneA = [...seeds];
+  if (state.retrievalChips.expand) {
+    for (const seed of seeds) {
+      // Hop 1: find linked memories
+      const hop1Ids = [];
+      if (seed.linkedProblem) hop1Ids.push(seed.linkedProblem);
+      const linkedSols = MEMORY_BANK.filter(m => m.linkedProblem === seed.id);
+      hop1Ids.push(...linkedSols.map(m => m.id));
+
+      for (const hop1Id of hop1Ids) {
+        const hop1mem = MEMORY_BANK.find(m => m.id === hop1Id);
+        if (!hop1mem || laneA.some(r => r.id === hop1Id)) continue;
+        const hop1Score = cosineSim(hop1mem.embedding, qEmb) * 0.85;
+        if (hop1Score > threshold * 0.7) {
+          laneA.push({ ...hop1mem, score: hop1Score, hop: 1 });
+          // Hop 2
+          const hop2candidates = MEMORY_BANK.filter(m =>
+            (m.linkedProblem === hop1Id || m.id === hop1mem.linkedProblem) &&
+            !laneA.some(r => r.id === m.id)
+          );
+          for (const h2 of hop2candidates) {
+            const h2score = cosineSim(h2.embedding, qEmb) * 0.7;
+            if (h2score > threshold * 0.6) {
+              laneA.push({ ...h2, score: h2score, hop: 2 });
+            }
+          }
+        }
+      }
+    }
+  }
+  retrievalResults.laneA = laneA;
+  document.getElementById('stage-laneA-count').textContent = laneA.length;
+
+  // Lane B: keyword
+  await animateStage(2, null, () => {});
+  const laneB = scoped.filter(m => {
+    const mWords = new Set(m.text.toLowerCase().split(/\W+/));
+    const overlap = [...queryWords].filter(w => mWords.has(w)).length;
+    return overlap >= 1;
+  }).map(m => {
+    const mWords = new Set(m.text.toLowerCase().split(/\W+/));
+    const overlap = [...queryWords].filter(w => mWords.has(w)).length;
+    return { ...m, score: Math.min(overlap * 0.2, 0.8), hop: 'keyword' };
+  }).slice(0, 6);
+  retrievalResults.laneB = laneB;
+  document.getElementById('stage-laneB-count').textContent = laneB.length;
+
+  // Merge
+  await animateStage(3, null, () => {});
+  const merged = [...laneA];
+  for (const b of laneB) {
+    if (!merged.some(m => m.id === b.id)) merged.push(b);
+  }
+  document.getElementById('stage-merge-count').textContent = merged.length;
+
+  // Threshold
+  await animateStage(4, null, () => {});
+  const aboveThreshold = merged.filter(m => m.score >= state.threshold);
+  document.getElementById('stage-threshold-count').textContent = aboveThreshold.length;
+
+  // Final
+  await animateStage(5, null, () => {});
+  document.getElementById('stage-final-count').textContent = Math.min(aboveThreshold.length, 10);
+
+  // Show lanes
+  document.getElementById('lanesSection').style.display = 'grid';
+  document.getElementById('mergeSection').style.display = 'block';
+  renderLaneResults();
+  renderMergeResults();
+  updatePrompt();
+}
+
+function delay(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+function kindColor(k) { return KIND_COLORS[k] || '#888'; }
+
+function renderLaneResults() {
+  const aEl = document.getElementById('laneAResults');
+  const bEl = document.getElementById('laneBResults');
+
+  aEl.innerHTML = retrievalResults.laneA.length === 0
+    ? '<div class="empty-state">No results</div>'
+    : retrievalResults.laneA.map(m => {
+        const hopLabel = m.hop === 0 ? 'seed' : m.hop === 1 ? 'hop-1' : 'hop-2';
+        const hopClass = `hop-${m.hop}`;
+        return `<div class="memory-result" style="border-left-color:${kindColor(m.kind)}" onclick="toggleDetail(this)">
+          <div class="dot" style="background:${kindColor(m.kind)}"></div>
+          <div class="text">
+            <span class="hop-indicator ${hopClass}">${hopLabel}</span>
+            ${m.text}
+          </div>
+          <div class="score">${m.score.toFixed(2)}</div>
+        </div>
+        <div class="result-details">
+          <strong>Kind:</strong> ${m.kind} · <strong>Scope:</strong> ${m.scope}<br>
+          ${m.linkedProblem ? `<strong>Linked to problem:</strong> ${m.linkedProblem}<br>` : ''}
+          <em>Score ${m.score.toFixed(3)} = cosine sim${m.hop > 0 ? ' × ' + (m.hop === 1 ? '0.85' : '0.70') + ' (hop decay)' : ''}</em>
+        </div>`;
+      }).join('');
+
+  bEl.innerHTML = retrievalResults.laneB.length === 0
+    ? '<div class="empty-state">No keyword matches</div>'
+    : retrievalResults.laneB.map(m => `
+        <div class="memory-result" style="border-left-color:${kindColor(m.kind)}" onclick="toggleDetail(this)">
+          <div class="dot" style="background:${kindColor(m.kind)}"></div>
+          <div class="text">${m.text}</div>
+          <div class="score">${m.score.toFixed(2)}</div>
+        </div>
+        <div class="result-details">
+          <strong>Kind:</strong> ${m.kind} · <strong>Scope:</strong> ${m.scope}<br>
+          <em>Matched via lexical keyword overlap — catches semantic blind spots</em>
+        </div>`).join('');
+}
+
+function toggleDetail(el) {
+  el.classList.toggle('expanded');
+  const details = el.nextElementSibling;
+  if (details && details.classList.contains('result-details')) {
+    details.classList.toggle('visible');
+  }
+}
+
+function renderMergeResults() {
+  const threshold = state.threshold;
+  const merged = [...retrievalResults.laneA];
+  for (const b of retrievalResults.laneB) {
+    if (!merged.some(m => m.id === b.id)) merged.push(b);
+  }
+  merged.sort((a, b) => b.score - a.score);
+
+  const el = document.getElementById('mergeResults');
+  if (merged.length === 0) { el.innerHTML = '<div class="empty-state">Run a query first</div>'; return; }
+
+  el.innerHTML = merged.map(m => {
+    const passes = m.score >= threshold;
+    return `<div class="memory-result" style="border-left-color:${kindColor(m.kind)};opacity:${passes ? 1 : 0.35}" onclick="toggleDetail(this)">
+      <div class="dot" style="background:${kindColor(m.kind)}"></div>
+      <div class="text">${m.text} ${!passes ? '<em style="color:var(--failed);font-size:10px">[below threshold]</em>' : ''}</div>
+      <div class="score" style="color:${passes ? 'var(--solution)' : 'var(--failed)'}">${m.score.toFixed(2)}</div>
+    </div>
+    <div class="result-details">
+      <strong>Kind:</strong> <span class="badge badge-${m.kind}">${m.kind}</span> · <strong>Scope:</strong> ${m.scope}<br>
+      ${passes ? '✓ Passes threshold — will be included in context' : '✕ Below threshold — excluded ("empty is correct" principle)'}
+    </div>`;
+  }).join('');
+}
+
+// ============================================================
+// FACT CHAIN VIEW
+// ============================================================
+let factChains = [
+  {
+    id: 'chain1',
+    nodes: [
+      { id: 'fact-a1', kind: 'fact', text: 'JWT_SECRET is hardcoded in auth.config.ts', date: '2026-02-14', superseded: true },
+      { id: 'change-1', kind: 'change', text: 'Migrated secrets to environment variables for security', date: '2026-02-16' },
+      { id: 'fact-a2', kind: 'fact', text: 'JWT_SECRET loaded from process.env.JWT_SECRET in auth.config.ts', date: '2026-02-16', superseded: true },
+      { id: 'change-2', kind: 'change', text: 'Auth config moved to next.config.js serverRuntimeConfig', date: '2026-02-18' },
+      { id: 'fact-a3', kind: 'fact', text: 'JWT_SECRET loaded from next.config.js serverRuntimeConfig.jwtSecret', date: '2026-02-18', superseded: false },
+    ]
+  },
+  {
+    id: 'chain2',
+    nodes: [
+      { id: 'fact-b1', kind: 'fact', text: 'Auth middleware lives in /middleware/auth.ts', date: '2026-02-14', superseded: true },
+      { id: 'change-3', kind: 'change', text: 'Refactored auth into lib/auth/ module for reuse', date: '2026-02-17' },
+      { id: 'fact-b2', kind: 'fact', text: 'Auth middleware lives in /lib/auth/withAuth.ts', date: '2026-02-17', superseded: false },
+    ]
+  }
+];
+let nextFactId = 200;
+
+function renderFactView() {
+  const chainsEl = document.getElementById('factChains');
+  const snapshotEl = document.getElementById('factSnapshot');
+  const oldFactSelect = document.getElementById('oldFactSelect');
+
+  // Render chains
+  chainsEl.innerHTML = factChains.map(chain => {
+    const nodesHtml = chain.nodes.map((node, i) => {
+      const isLast = i === chain.nodes.length - 1;
+      const isFact = node.kind === 'fact';
+      const isCurrentFact = isFact && !node.superseded;
+      const nodeClass = `chain-node ${isFact ? 'fact-node' : 'change-node'} ${node.superseded ? 'superseded' : ''} ${isCurrentFact ? 'current' : ''}`;
+      const arrow = i < chain.nodes.length - 1 ? `
+        <div class="chain-arrow">
+          <span>→</span>
+          <span class="chain-arrow-label">immutable link</span>
+        </div>` : '';
+      return `
+        <div class="chain-node ${nodeClass}" title="${node.text}">
+          <div class="chain-node-kind">${node.kind}${isCurrentFact ? ' ✓ current' : node.superseded ? ' (superseded)' : ''}</div>
+          <div class="chain-node-text">${node.text}</div>
+          <div class="chain-node-date">${node.date}</div>
+        </div>${arrow}`;
+    }).join('');
+    return `<div style="margin-bottom:20px">
+      <div style="font-size:11px;color:var(--text-dimmer);margin-bottom:8px">Chain ${chain.id.replace('chain','#')}</div>
+      <div class="chain-row">${nodesHtml}</div>
+    </div>`;
+  }).join('');
+
+  // Snapshot
+  const currentFacts = factChains.flatMap(c =>
+    c.nodes.filter(n => n.kind === 'fact' && !n.superseded)
+  );
+  snapshotEl.innerHTML = currentFacts.map(f => `
+    <div class="snapshot-banner" style="margin-bottom:8px">
+      <span>✓</span>
+      <div>
+        <div style="font-weight:600">${f.text}</div>
+        <div style="font-size:10px;opacity:0.7">written ${f.date} · part of current_fact_snapshot view</div>
+      </div>
+    </div>`).join('');
+
+  // Old fact select
+  const allFacts = factChains.flatMap(c => c.nodes.filter(n => n.kind === 'fact' && !n.superseded));
+  oldFactSelect.innerHTML = allFacts.map(f => `<option value="${f.id}">${f.text.slice(0,50)}…</option>`).join('');
+}
+
+function addFactUpdate() {
+  const oldFactId = document.getElementById('oldFactSelect').value;
+  const changeText = document.getElementById('changeInput').value.trim();
+  const newFactText = document.getElementById('newFactInput').value.trim();
+  if (!changeText || !newFactText) { alert('Fill in all fields'); return; }
+
+  const today = new Date().toISOString().slice(0,10);
+  const changeId = 'change-' + nextFactId++;
+  const newFactId = 'fact-' + nextFactId++;
+
+  // Find the chain containing the old fact
+  for (const chain of factChains) {
+    const oldNode = chain.nodes.find(n => n.id === oldFactId);
+    if (oldNode) {
+      oldNode.superseded = true;
+      chain.nodes.push({ id: changeId, kind: 'change', text: changeText, date: today });
+      chain.nodes.push({ id: newFactId, kind: 'fact', text: newFactText, date: today, superseded: false });
+      break;
+    }
+  }
+
+  document.getElementById('changeInput').value = '';
+  document.getElementById('newFactInput').value = '';
+  renderFactView();
+  updatePrompt();
+}
+
+// ============================================================
+// UTILITY VIEW
+// ============================================================
+let utilityObs = [
+  { id: 'u1', memoryId: 'm2', memoryText: 'Check token expiry before refresh in withAuth()', problemId: 'm1', problemText: 'JWT refresh fails silently', vote: 1, rationale: 'Directly fixed the bug' },
+  { id: 'u2', memoryId: 'm3', memoryText: 'Tried client-side refresh', problemId: 'm1', problemText: 'JWT refresh fails silently', vote: -0.8, rationale: 'Made the problem worse' },
+  { id: 'u3', memoryId: 'm5', memoryText: 'Auth middleware in /lib/auth/withAuth.ts', problemId: 'm1', problemText: 'JWT refresh fails silently', vote: 0.6, rationale: 'Helped find the right file' },
+  { id: 'u4', memoryId: 'm10', memoryText: 'Use discriminated unions', problemId: 'm9', problemText: 'TS type errors in union types', vote: 1, rationale: 'Exactly matched the pattern' },
+  { id: 'u5', memoryId: 'm2', memoryText: 'Check token expiry before refresh', problemId: 'm9', problemText: 'TS type errors in union types', vote: -0.3, rationale: 'Not relevant to type errors' },
+];
+let nextUtilId = 100;
+
+function renderUtilityView() {
+  const obsEl = document.getElementById('utilityObsTable');
+  const globalEl = document.getElementById('globalUtilityTable');
+  const vmSelect = document.getElementById('voteMemorySelect');
+  const vpSelect = document.getElementById('voteProblemSelect');
+
+  obsEl.innerHTML = utilityObs.map(o => {
+    const votePct = Math.abs(o.vote) * 40;
+    return `<div class="obs-row">
+      <div class="obs-memory" title="${o.memoryText}">${o.memoryText.slice(0,30)}…</div>
+      <div class="obs-problem">${o.problemText.slice(0,20)}…</div>
+      <div class="vote-bar-wrap">
+        ${o.vote > 0
+          ? `<div class="vote-bar vote-pos" style="width:${votePct}px"></div>`
+          : `<div class="vote-bar vote-neg" style="width:${votePct}px"></div>`}
+      </div>
+      <div class="vote-val" style="color:${o.vote > 0 ? 'var(--solution)' : o.vote < 0 ? 'var(--failed)' : 'var(--text-dim)'}">
+        ${o.vote > 0 ? '+' : ''}${o.vote.toFixed(1)}
+      </div>
+    </div>`;
+  }).join('');
+
+  // Global utility
+  const byMemory = {};
+  for (const o of utilityObs) {
+    if (!byMemory[o.memoryId]) byMemory[o.memoryId] = { text: o.memoryText, votes: [] };
+    byMemory[o.memoryId].votes.push(o.vote);
+  }
+  const global = Object.entries(byMemory).map(([id, d]) => ({
+    id, text: d.text,
+    mean: d.votes.reduce((a,b) => a+b, 0) / d.votes.length,
+    n: d.votes.length,
+  })).sort((a,b) => b.mean - a.mean);
+
+  globalEl.innerHTML = global.map(g => {
+    const pct = ((g.mean + 1) / 2) * 100;
+    const color = g.mean > 0.3 ? 'var(--solution)' : g.mean < -0.3 ? 'var(--failed)' : 'var(--fact)';
+    return `<div class="global-util-bar">
+      <div class="util-mem-name" title="${g.text}">${g.text.slice(0,35)}…</div>
+      <div class="util-bar-track"><div class="util-bar-fill" style="width:${pct}%;background:${color}"></div></div>
+      <div class="util-n" style="color:var(--text-dimmer)">n=${g.n}</div>
+      <div class="util-mean" style="color:${color}">${g.mean > 0 ? '+' : ''}${g.mean.toFixed(2)}</div>
+    </div>`;
+  }).join('');
+
+  // Selects
+  const memories = [...new Map(utilityObs.map(o => [o.memoryId, { id: o.memoryId, text: o.memoryText }])).values()];
+  const problems = [...new Map(utilityObs.map(o => [o.problemId, { id: o.problemId, text: o.problemText }])).values()];
+  vmSelect.innerHTML = memories.map(m => `<option value="${m.id}|${m.text}">${m.text.slice(0,35)}…</option>`).join('');
+  vpSelect.innerHTML = problems.map(p => `<option value="${p.id}|${p.text}">${p.text.slice(0,30)}…</option>`).join('');
+}
+
+function castVote(vote) {
+  const memParts = document.getElementById('voteMemorySelect').value.split('|');
+  const probParts = document.getElementById('voteProblemSelect').value.split('|');
+  utilityObs.push({
+    id: 'u' + nextUtilId++,
+    memoryId: memParts[0], memoryText: memParts[1],
+    problemId: probParts[0], problemText: probParts[1],
+    vote, rationale: '',
+  });
+  renderUtilityView();
+  updatePrompt();
+}
+
+// ============================================================
+// SCOPE VIEW
+// ============================================================
+const SCOPE_DATA = {
+  'api-service': [
+    { kind: 'problem', text: 'JWT refresh silently fails in middleware', scope: 'repo', visible: true },
+    { kind: 'solution', text: 'Check token expiry before refresh in withAuth()', scope: 'repo', visible: true },
+    { kind: 'failed_tactic', text: 'Client-side refresh caused race condition', scope: 'repo', visible: true },
+    { kind: 'fact', text: 'Auth middleware in /lib/auth/withAuth.ts', scope: 'repo', visible: true },
+    { kind: 'preference', text: 'Use TypeScript strict mode (global)', scope: 'global', visible: true },
+    { kind: 'preference', text: 'Use zod for API validation (repo override)', scope: 'repo', visible: true },
+    { kind: 'problem', text: 'Offline sync conflicts on reconnect [mobile-app]', scope: 'mobile-app', visible: false },
+    { kind: 'fact', text: 'Sync state in /stores/syncStore.ts [mobile-app]', scope: 'mobile-app', visible: false },
+  ],
+  'mobile-app': [
+    { kind: 'problem', text: 'Offline sync conflicts on reconnect', scope: 'repo', visible: true },
+    { kind: 'fact', text: 'Sync state managed in /stores/syncStore.ts', scope: 'repo', visible: true },
+    { kind: 'preference', text: 'Use TypeScript strict mode (global)', scope: 'global', visible: true },
+    { kind: 'problem', text: 'JWT refresh silently fails [api-service]', scope: 'api-service', visible: false },
+    { kind: 'solution', text: 'Check token expiry in withAuth() [api-service]', scope: 'api-service', visible: false },
+  ]
+};
+
+function renderScopeDemo() {
+  const repo = document.getElementById('scopeRepoSelect').value;
+  const query = document.getElementById('scopeQuery').value.toLowerCase();
+  const data = SCOPE_DATA[repo];
+  const el = document.getElementById('scopeResultGrid');
+
+  const visible = data.filter(d => d.visible && (d.text.toLowerCase().includes(query) || query.length < 2));
+  const hidden = data.filter(d => !d.visible);
+
+  el.innerHTML = `
+    <div class="scope-result-box" style="border:1px solid var(--solution)">
+      <div class="label" style="color:var(--solution)">✓ Visible (${visible.length} records)</div>
+      ${visible.map(d => `<div class="item">
+        <span class="badge badge-${d.kind}">${d.kind}</span>
+        <span class="badge ${d.scope === 'global' ? 'visible-badge' : 'visible-badge'}">${d.scope}</span>
+        ${d.text.slice(0,45)}…
+      </div>`).join('')}
+    </div>
+    <div class="scope-result-box" style="border:1px solid var(--failed)">
+      <div class="label" style="color:var(--failed)">✕ Invisible — hard filtered (${hidden.length} records)</div>
+      ${hidden.map(d => `<div class="item" style="opacity:0.5">
+        <span class="badge badge-${d.kind}">${d.kind}</span>
+        <span class="badge hidden-badge">wrong repo</span>
+        ${d.text.slice(0,45)}…
+      </div>`).join('')}
+      <div style="margin-top:6px;font-size:10px;color:var(--failed);font-style:italic">Not lower-ranked — physically inaccessible. The DB isn't even opened.</div>
+    </div>`;
+}
+
+// ============================================================
+// SESSION FLOW VIEW
+// ============================================================
+const SESSION_STEPS = [
+  {
+    icon: '▶', color: '#6366f1',
+    title: 'Session Start — Ambient Read',
+    desc: 'Agent opens the repo. Before any work, it runs an ambient read to pre-load context from long-term memory. Stricter threshold — only high-confidence memories packed.',
+    ops: ['<span class="flow-step-op op-read">read (ambient)</span>'],
+    detail: 'repo_id: api-service · mode: ambient · include_global: true · threshold: 0.60',
+  },
+  {
+    icon: '?', color: '#3b82f6',
+    title: 'Problem Encountered',
+    desc: 'User reports: "JWT refresh is failing silently in production." Agent recognizes a new problem and does a targeted read — more permissive threshold, focused query.',
+    ops: ['<span class="flow-step-op op-read">read (targeted)</span>'],
+    detail: 'query: "JWT token refresh failing silently Next.js" · mode: targeted · threshold: 0.40',
+  },
+  {
+    icon: '↗', color: '#a855f7',
+    title: 'Retrieval — Two-Lane Recall',
+    desc: 'Lane A: finds similar problems + expands 2 hops via association walk. Lane B: keyword search catches "middleware" and "refresh". Results merged, deduped, threshold applied.',
+    ops: ['<span class="flow-step-op" style="background:rgba(99,102,241,0.2);color:#a5b4fc">lane-A</span><span class="flow-step-op" style="background:rgba(6,182,212,0.2);color:var(--change)">lane-B</span>'],
+    detail: 'Seeds: 3 above threshold · Hop-1: 4 memories · Hop-2: 2 memories · Keyword: 3 · Final merged: 8',
+  },
+  {
+    icon: '⚙', color: '#eab308',
+    title: 'Agent Works + Current Code Is Ground Truth',
+    desc: 'Agent reads current code. Memory says "JWT_SECRET hardcoded" — but code shows it moved to env vars. Memory is stale. Agent ignores memory, trusts live code. Solves the bug.',
+    ops: [],
+    detail: 'Principle enforced: current codebase observation overrides advisory memory. Memory treated as candidate tool, not command.',
+  },
+  {
+    icon: '✓', color: '#22c55e',
+    title: 'Session End — Write Memories',
+    desc: 'Agent writes what worked, what failed, and the current fact. All writes are immutable. The problem-solution-failed_tactic graph grows.',
+    ops: [
+      '<span class="flow-step-op op-write">write (problem)</span>',
+      '<span class="flow-step-op op-write">write (solution)</span>',
+      '<span class="flow-step-op op-write">write (failed_tactic)</span>',
+      '<span class="flow-step-op op-write">write (fact)</span>',
+    ],
+    detail: 'kind: problem · solution links to problem_id · failed_tactic links to problem_id · scope: repo',
+  },
+  {
+    icon: '↑', color: '#06b6d4',
+    title: 'Session End — Fact Update Chain',
+    desc: 'Old fact (JWT_SECRET was hardcoded) is now superseded. Agent writes: change memory + new fact + fact_update_link. The immutable chain is preserved. current_fact_snapshot updated.',
+    ops: [
+      '<span class="flow-step-op op-write">write (change)</span>',
+      '<span class="flow-step-op op-write">write (fact)</span>',
+      '<span class="flow-step-op op-update">update (fact_update_link)</span>',
+    ],
+    detail: 'old_fact_id → change_id → new_fact_id. No truth score mutated. Chain is the truth.',
+  },
+  {
+    icon: '★', color: '#f97316',
+    title: 'Session End — Utility Votes',
+    desc: 'Agent rates each retrieved memory: "Was this helpful for THIS problem?" Votes recorded as (memory_id, problem_id, vote) observations. Global utility computed after the fact as weak prior.',
+    ops: [
+      '<span class="flow-step-op op-update">update (utility_vote)</span>',
+    ],
+    detail: 'solution memory: vote +1.0 · failed_tactic: vote -0.8 · stale fact: vote -0.5 · unrelated preference: vote 0.0',
+  },
+];
+
+let sessionStepIndex = -1;
+let sessionInterval = null;
+
+function renderSessionFlow() {
+  const el = document.getElementById('sessionFlow');
+  el.innerHTML = SESSION_STEPS.map((step, i) => `
+    <div class="flow-step" id="session-step-${i}">
+      <div class="flow-step-left">
+        <div class="flow-step-icon" style="border-color:${step.color};color:${step.color};background:${step.color}18"
+             onclick="activateStep(${i})">${step.icon}</div>
+        ${i < SESSION_STEPS.length - 1 ? `<div class="flow-step-line" id="line-${i}"></div>` : ''}
+      </div>
+      <div class="flow-step-body" id="step-body-${i}">
+        <div class="flow-step-title">${step.title}</div>
+        <div class="flow-step-desc">${step.desc}</div>
+        <div style="margin-top:6px">${step.ops.join('')}</div>
+        <div style="margin-top:6px;font-size:10px;color:var(--text-dimmer);font-family:monospace;background:var(--surface3);padding:5px 8px;border-radius:4px;display:none" id="step-detail-${i}">${step.detail}</div>
+      </div>
+    </div>
+  `).join('');
+}
+
+function activateStep(i) {
+  sessionStepIndex = i;
+  document.querySelectorAll('.flow-step-body').forEach((el, j) => {
+    el.classList.toggle('active', j === i);
+    document.getElementById(`step-detail-${j}`).style.display = j === i ? 'block' : 'none';
+  });
+  document.querySelectorAll('.flow-step-line').forEach((el, j) => {
+    el.classList.toggle('active-line', j < i);
+  });
+  updatePrompt();
+}
+
+function playSession() {
+  if (sessionInterval) { clearInterval(sessionInterval); sessionInterval = null; }
+  sessionStepIndex = -1;
+  const steps = SESSION_STEPS.length;
+  let current = 0;
+  activateStep(0);
+  sessionInterval = setInterval(() => {
+    current++;
+    if (current >= steps) { clearInterval(sessionInterval); sessionInterval = null; return; }
+    activateStep(current);
+  }, 1200);
+}
+
+// ============================================================
+// PROMPT OUTPUT
+// ============================================================
+function updatePrompt() {
+  const el = document.getElementById('promptText');
+  const prompts = {
+    graph: selectedNode
+      ? `Explain the "${selectedNode.kind}" memory: "${selectedNode.text}" — how does the ${selectedNode.kind === 'problem' ? 'problem-solution-failed_tactic' : 'association'} graph expand from this node during retrieval, and what linked context would be pulled automatically?`
+      : `Explain the experiential memory graph in this LLM agent memory system — how are problems, solutions, and failed tactics linked as first-class records, and why does matching any node pull its full linked context?`,
+    retrieval: `Explain the two-lane retrieval pipeline for this LLM agent memory system: how does Lane A (semantic + ${state.retrievalChips.expand ? '2-hop association walk with decay' : 'no expansion'}) work alongside Lane B (keyword search), why are they merged and deduplicated, and what does a ${state.retrievalMode} read threshold mean for precision vs recall?`,
+    facts: `Explain how fact truth evolves in this memory system: instead of a mutable truth score, facts form immutable update chains (old_fact → change_memory → new_fact). What does the current_fact_snapshot view represent, and why is this design better than a mutable accuracy scalar?`,
+    utility: `Explain the utility observation system: votes are context-specific per (memory_id, problem_id) pair, not global. How does the global_utility view serve as a weak prior rather than the primary signal, and why is optional evidence acceptable for utility votes but not for truth updates?`,
+    scope: `Explain the physical scope separation in this agent memory system: why are repo boundaries enforced as separate SQLite databases (hard filter) rather than just lower-ranked scores? How does a read operation combine the repo DB and global DB, and what exactly is and isn't accessible?`,
+    session: sessionStepIndex >= 0
+      ? `In the agent session flow, explain step ${sessionStepIndex + 1}: "${SESSION_STEPS[sessionStepIndex].title}" — ${SESSION_STEPS[sessionStepIndex].detail}`
+      : `Walk through a complete agent session in this memory system: ambient read at start → problem encounter → two-lane retrieval → working with code as ground truth → session-end writes of problem/solution/failed_tactic → fact chain update → utility votes.`,
+  };
+  el.textContent = prompts[state.activeTab] || '';
+}
+
+function copyPrompt() {
+  const text = document.getElementById('promptText').textContent;
+  navigator.clipboard.writeText(text).catch(() => {});
+  const btn = document.querySelector('.copy-btn');
+  btn.textContent = 'Copied!';
+  setTimeout(() => btn.textContent = 'Copy', 1500);
+}
+
+// ============================================================
+// INIT
+// ============================================================
+window.addEventListener('load', () => {
+  initGraph();
+  renderFactView();
+  renderUtilityView();
+  renderScopeDemo();
+  renderSessionFlow();
+  updatePrompt();
+});
+</script>
+</body>
+</html>

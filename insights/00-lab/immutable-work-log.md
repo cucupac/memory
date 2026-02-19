@@ -87,3 +87,58 @@ Rules:
 - Did not work / risk: none noted in this step.
 - Open: semantic validation matrix details by kind remain to be finalized.
 - Files touched: insights/04-contracts/memory-interface-json-schemas-v1.md, insights/discovery.md, insights/README.md, insights/00-lab/immutable-work-log.md.
+
+## 2026-02-18 21:50:21 CST
+
+- Proposed: audit convo transcript against `insights/` and fill missing ratified refinements.
+- Worked: identified and captured missing synthesis around anti-rigidity update policy and late interface clarifications.
+- Did not work / risk: some fallback mechanics were approved directionally but remain underspecified numerically.
+- Open: exact bounded update math and exact no-evidence utility fallback behavior.
+- Files touched: `insights/03-refinements/lightweight-update-policy-and-interface-clarifications.md`, `insights/00-lab/immutable-work-log.md`, `insights/discovery.md`.
+
+## 2026-02-18 23:30:45 CST
+
+- Proposed: lock a concrete storage schema matching the approved interface and latest modeling decisions.
+- Worked: converged on relational SQLite v1 with explicit graph semantics via link tables.
+- Worked: simplified experiential linkage to direct `problem_attempts` (no separate scenario table in v1).
+- Worked: removed mutable truth/accuracy score; modeled fact correctness via immutable `fact_updates` chains and `current_fact_snapshot` view.
+- Worked: captured utility as contextual observations in `[-1,1]` via `(memory_id, problem_id, vote)`.
+- Did not work / risk: full trigger-level enforcement of all semantic invariants was deferred; still relies on interface semantic validation.
+- Open: whether scenario-level metadata earns reintroducing a scenario container later.
+- Files touched: `insights/04-contracts/memory-storage-relational-schema-v1.md`, `insights/00-lab/immutable-work-log.md`, `insights/discovery.md`.
+
+## 2026-02-19 02:08:59 CST
+
+- Proposed: separate naming into policy layer (`Read Policy`, `Write Policy`) and interface verb layer (`create`, `read`, `update`).
+- Worked: clarified that `update` is operationally a write-path action while still remaining its own interface verb for cleaner agent behavior.
+- Worked: established deterministic routing mental model: `read` -> Read Policy; `create`/`update` -> Write Policy.
+- Did not work / risk: term drift remains because current contract payloads still use `op: "write"` while conversation naming now prefers `create`.
+- Open: whether to rename wire-level `op: "write"` to `op: "create"` now, or support `create/write` aliasing for a transition period.
+- Files touched: `insights/00-lab/immutable-work-log.md`, `insights/discovery.md`.
+
+## 2026-02-19 02:21:32 CST
+
+- Proposed: ratify a concrete Write Policy v1 that bridges interface verbs and relational schema side effects.
+- Worked: locked policy routing and boundaries — `read` uses Read Policy; `create` and `update` use Write Policy; LLM still decides memory judgment (`kind`, `scope`, text, links, evidence refs) while policy enforces deterministic validity/storage.
+- Worked: locked write validity as 3 ordered gates: schema validity -> write-policy semantic validity -> DB integrity validity (single atomic transaction or full reject).
+- Worked: locked strict evidence stance for create in v1 (`evidence_refs >= 1` for all create kinds, including `preference`, where evidence may be conversation/user-turn references).
+- Worked: locked deterministic update mapping:
+  - `archive_state` -> `memories.archived`,
+  - `utility_vote` -> `utility_observations`,
+  - `fact_update_link` -> `fact_updates` with kind checks.
+- Did not work / risk: evidence pointer storage is concrete (`evidence_refs` table), but canonical storage contract for the underlying episodic source content remains underspecified.
+- Open: define episodic ongoing log contract (where source content lives + canonical `evidence_ref` pointer format).
+- Files touched: `insights/00-lab/immutable-work-log.md`, `insights/discovery.md`.
+
+## 2026-02-19 02:28:14 CST
+
+- Proposed: finalize episodic ongoing log strategy so evidence pointers have a single canonical target.
+- Worked: ratified single source of truth in SQLite for episodic data; any plaintext/markdown running log is export-only and non-authoritative.
+- Worked: ratified minimal episodic schema direction:
+  - `episodes(id, repo_id, started_at, ended_at)`
+  - `episode_events(id, episode_id, seq, content, created_at)`
+- Worked: ratified event granularity as one row per individual message/tool call (not one row per full turn), while keeping `content` minimally structured.
+- Worked: ratified v1 evidence pointer unit as whole-event references (`ref = episode_event_id`), deferring span-level offsets.
+- Did not work / risk: if event payload shape is left too implicit, implementations may diverge on what gets serialized into `content`.
+- Open: define canonical v1 `episode_events.content` payload shape and canonical `evidence_ref` string format.
+- Files touched: `insights/00-lab/immutable-work-log.md`, `insights/discovery.md`.

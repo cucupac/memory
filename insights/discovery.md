@@ -2,6 +2,16 @@
 
 Chronological, append-only record of how memory-system ideas evolved.
 
+## Update Rule
+
+When a new memory-design idea is discussed:
+- First append raw notes to `00-lab/immutable-work-log.md`.
+- Then append a distilled dated entry to `discovery.md` with:
+- What changed.
+- Why it changed.
+- Which files were updated.
+- What remains open.
+
 ## 2026-02-14 - Foundation Baseline
 
 Conversation established the baseline architecture captured in:
@@ -178,12 +188,149 @@ Why it changed:
 What remains open:
 - Final semantic validation matrix by kind/field requirement (especially linking requirements and edge-case rules).
 
-## Update Rule
+## 2026-02-18 - Retrospective Gap Fill: Lightweight Update Policy + Late Interface Clarifications
 
-When a new memory-design idea is discussed:
-- First append raw notes to `00-lab/immutable-work-log.md`.
-- Then append a distilled dated entry to `discovery.md` with:
-- What changed.
-- Why it changed.
-- Which files were updated.
-- What remains open.
+Card added:
+- `03-refinements/lightweight-update-policy-and-interface-clarifications.md`
+
+What changed:
+- Captured the ratified anti-rigidity principle explicitly: avoid fixed update taxonomies and keep reasoning freeform while contracts stay minimal.
+- Captured the ratified lightweight update shape explicitly: dynamic `truth` and `utility` in `[0,1]`, confidence/rationale/refs at reflection time, bounded deterministic adjustment (not pure intuition).
+- Captured attribution reality for utility updates: optional evidence is acceptable, with weaker/deferred impact when evidence is missing.
+- Captured late interface clarifications in one place:
+  - single `update` op with `mode: "dry_run" | "commit"` rather than separate `propose_update`/`apply_update`,
+  - explicit `scope` + `kind` in `write` (no `auto`),
+  - `read.kinds` as include filter.
+
+Why it changed:
+- These points were discussed and approved in the thread but were spread across transcript turns and not represented as a dedicated refinement note.
+
+What remains open:
+- Exact numerical update-function parameters (caps/damping/skip thresholds).
+- Final fallback policy for utility updates with no evidence (small delta vs defer).
+
+## 2026-02-18 - Ratified Card: Concrete Relational Storage Schema v1 (No Truth Score)
+
+Card added:
+- `04-contracts/memory-storage-relational-schema-v1.md`
+
+What changed:
+- Ratified relational (SQLite) storage for v1, with graph semantics represented through explicit link tables rather than a graph database.
+- Ratified top-level memory kinds as stored immutable records:
+  - `problem`, `solution`, `failed_tactic`, `fact`, `preference`, `change`.
+- Ratified direct experiential linkage with:
+  - `problem_attempts(problem_id, attempt_id, role)` where role is `solution` or `failed_tactic`.
+- Ratified fact-change modeling as immutable chain links:
+  - `old_fact_id + change_id -> new_fact_id` via `fact_updates`.
+- Ratified current-fact representation as a derived snapshot view:
+  - `current_fact_snapshot`.
+- Ratified utility storage as contextual observations:
+  - `utility_observations(memory_id, problem_id, vote in [-1,1])`.
+- Ratified removal of mutable truth/accuracy score in v1.
+
+Why it changed:
+- To make data storage as concrete as the already-approved interface schemas.
+- To preserve provenance and append-only history while keeping the model simple and implementation-ready.
+- To avoid premature complexity from truth-scoring machinery when fact updates already encode truth evolution explicitly.
+
+What remains open:
+- Whether scenario-level metadata should reintroduce a scenario container later.
+- Whether semantic invariants should also be enforced with DB triggers in addition to interface semantic validation.
+
+## 2026-02-19 - Ratified Naming Split: Interface Verbs vs Policy Layers
+
+What changed:
+- Ratified policy-layer names:
+  - `Read Policy` for retrieval behavior.
+  - `Write Policy` for create/update acceptance, validation, and DB side effects.
+- Ratified interface-verb framing:
+  - `create`, `read`, `update` as the conceptual external verbs.
+- Ratified routing between layers:
+  - `read` routes to Read Policy.
+  - `create` and `update` route to Write Policy.
+- Ratified that `update` remains a distinct interface verb (rather than collapsing everything into create/write), even though it is write-path behavior internally.
+
+Why it changed:
+- To reduce naming ambiguity between policy and API layers.
+- To keep the interface clear for agents while preserving a strict internal write-path rule system.
+- To avoid turning create/write into a catch-all operation with overloaded semantics.
+
+Files updated:
+- `insights/00-lab/immutable-work-log.md`
+- `insights/discovery.md`
+
+What remains open:
+- Whether to rename wire-level `op: "write"` to `op: "create"` in the interface contract, or support `create/write` aliasing for a migration window.
+
+## 2026-02-19 - Ratified Write Policy v1 (Create/Update Determinism)
+
+What changed:
+- Ratified policy routing:
+  - `read` -> Read Policy.
+  - `create` and `update` -> Write Policy.
+- Ratified role split:
+  - LLM provides judgment and intent (`kind`, `scope`, statement text, links, evidence refs).
+  - Write Policy performs deterministic acceptance/rejection and DB side effects.
+- Ratified ordered validity gates for write-path operations:
+  - schema validity,
+  - semantic write-policy validity,
+  - DB integrity validity.
+- Ratified atomicity:
+  - accepted create/update requests execute in one transaction;
+  - any failure aborts all side effects.
+- Ratified strict evidence requirement for create in v1:
+  - `evidence_refs >= 1` for all create kinds (`problem`, `solution`, `failed_tactic`, `fact`, `preference`, `change`).
+  - for preferences, evidence may be user-message/session references (not necessarily code references).
+- Ratified deterministic side-effect mapping:
+  - `create(problem|fact|preference|change)` -> `memories` (+ evidence link rows),
+  - `create(solution|failed_tactic)` -> `memories` + `problem_attempts` (+ evidence link rows),
+  - `update(archive_state)` -> `memories.archived`,
+  - `update(utility_vote)` -> `utility_observations`,
+  - `update(fact_update_link)` -> `fact_updates` (with kind checks).
+
+Why it changed:
+- To close the implementation gap between schema definitions and executable behavior.
+- To make write-path behavior unambiguous and auditable for implementers.
+- To preserve LLM judgment while enforcing deterministic storage rules.
+
+Files updated:
+- `insights/00-lab/immutable-work-log.md`
+- `insights/discovery.md`
+
+What remains open:
+- Concrete episodic ongoing log contract for source content storage (the target that `evidence_refs.ref` points to).
+- Canonical `evidence_ref` pointer format for episode/user/tool/file spans.
+- Whether wire-level `op: "write"` should be renamed to `op: "create"` or aliased during migration.
+
+## 2026-02-19 - Ratified Episodic Log Direction v1 (Single Source + Minimal Event Model)
+
+What changed:
+- Ratified episodic storage authority:
+  - SQLite episodic tables are canonical.
+  - Any append-only text log is optional export only (non-authoritative).
+- Ratified minimal episodic schema direction:
+  - `episodes(id, repo_id, started_at, ended_at)`
+  - `episode_events(id, episode_id, seq, content, created_at)`
+- Ratified event granularity:
+  - one row per individual message/tool call,
+  - not one row per full turn blob.
+- Ratified v1 evidence targeting:
+  - `evidence_refs.ref` points to whole event IDs (`episode_event_id`).
+  - span-level pointers (`event_id:start:end`) are deferred.
+- Ratified write-path ergonomics:
+  - runtime auto-captures episodic events,
+  - LLM references generated event IDs in `evidence_refs` during create/update operations.
+
+Why it changed:
+- To eliminate dual-source drift between DB and ad-hoc append logs.
+- To keep evidence links stable, auditable, and easy to dereference.
+- To keep v1 schema minimal while preserving fine-grained evidence precision via per-event rows.
+
+Files updated:
+- `insights/00-lab/immutable-work-log.md`
+- `insights/discovery.md`
+
+What remains open:
+- Canonical payload format for `episode_events.content` in v1.
+- Canonical string format for `evidence_refs.ref` (for example, `event:<id>` vs plain `<id>`).
+- Whether any minimal event metadata should be mandatory in `content` (for example, source role or tool name) without introducing rigid event-type enums.
